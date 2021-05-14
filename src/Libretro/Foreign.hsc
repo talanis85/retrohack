@@ -15,6 +15,8 @@ import Foreign.C.String
 
 -- Opaque types -------------------------------------------------------------
 
+data RetroLogPrintfT
+
 -- Functions ----------------------------------------------------------------
 
 type Dyn a = FunPtr a -> a
@@ -121,8 +123,6 @@ foreign import ccall "wrapper" retro_input_poll_t
 type RetroInputStateT = CUInt -> CUInt -> CUInt -> CUInt -> IO CShort
 foreign import ccall "wrapper" retro_input_state_t
   :: Wrap RetroInputStateT
-
-type RetroLogPrintfT = ()
 
 -- lots are missing
 
@@ -242,4 +242,5 @@ instance Storable RetroLogCallback where
   alignment _ = #{alignment struct retro_log_callback}
   peek p = RetroLogCallback
     <$> ( #{peek struct retro_log_callback, log} p )
-  poke p (RetroLogCallback {..}) = error "Cannot poke RetroLogCallback"
+  poke p (RetroLogCallback {..}) = do
+    #{poke struct retro_log_callback, log} p retroLogCallbackLog

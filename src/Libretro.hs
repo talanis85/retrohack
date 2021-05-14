@@ -147,15 +147,13 @@ withCore fp env action = do
 
 makeRetroEnvironmentCallback :: RetroCore -> RetroEnvironment -> RetroEnvironmentT
 makeRetroEnvironmentCallback core env key dat
-  {-
   | key == 27 = do
-      logfun <- default_retro_log_printf
+      let logfun = default_retro_log_printf
       let logcb = RetroLogCallback
             { retroLogCallbackLog = logfun
             }
       poke (castPtr dat) logcb
       return 1
-  -}
   | otherwise = return 0
   where
     runGetter field = do

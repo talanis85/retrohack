@@ -9,5 +9,5 @@ import Libretro.Foreign
 
 #include "helpers.h"
 
-foreign import ccall "default_retro_log_printf" default_retro_log_printf
-  :: IO (FunPtr RetroLogPrintfT)
+foreign import ccall "&default_retro_log_printf" default_retro_log_printf
+  :: FunPtr RetroLogPrintfT

@@ -1,3 +1,3 @@
 #include "libretro.h"
 
-extern struct retro_log_callback default_retro_log_callback;
+extern void default_retro_log_printf(enum retro_log_level level, const char *fmt, ...);
