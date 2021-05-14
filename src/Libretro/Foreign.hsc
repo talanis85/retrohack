@@ -228,6 +228,7 @@ instance Storable RetroGameInfo where
     #{poke struct retro_game_info, path} p path
     dat <- newArray retroGameInfoData
     #{poke struct retro_game_info, data} p dat
+    #{poke struct retro_game_info, size} p (length retroGameInfoData)
     meta <- newCString retroGameInfoMeta
     #{poke struct retro_game_info, meta} p meta
 

@@ -71,8 +71,8 @@ loadGameInfo fp = do
   sysinfo <- retroGetSystemInfo
 
   let infoData = if retroSystemInfoNeedFullPath sysinfo
-        then BS.unpack bs
-        else []
+        then []
+        else BS.unpack bs
 
   return RetroGameInfo
     { retroGameInfoPath = fp
