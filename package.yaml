@@ -1,0 +1,55 @@
+name:                retrohack
+version:             0.1.0.0
+github:              "talanis85/retrohack"
+license:             BSD3
+author:              "Philip Kranz"
+maintainer:          "pk@pmlk.net"
+copyright:           "2021 Philip Kranz"
+
+extra-source-files:
+- README.md
+- ChangeLog.md
+
+synopsis:            A libretro frontend.
+category:            Games
+
+description:         Please see the README on GitHub at <https://github.com/talanis85/retrohack#readme>
+
+dependencies:
+- base >= 4.7 && < 5
+- array
+- mtl
+
+library:
+  source-dirs: src
+  dependencies:
+    - unix
+  build-tools:
+    - hsc2hs
+  include-dirs: c
+  c-sources: c/helpers.c
+
+executables:
+  retrohack:
+    main:                Main.hs
+    source-dirs:         app
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - retrohack
+    - bytestring
+    - GLFW-b
+    - unix
+
+tests:
+  retrohack-test:
+    main:                Spec.hs
+    source-dirs:         test
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - retrohack

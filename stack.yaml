@@ -1,0 +1,15 @@
+resolver: lts-16.31
+packages:
+- .
+# extra-deps: []
+nix:
+  enable: true
+  packages:
+    - libGL
+    - xorg.libX11
+    - xorg.libXi
+    - xorg.libXrandr
+    - xorg.libXxf86vm
+    - xorg.libXcursor
+    - xorg.libXinerama
+    - xorg.libXext
