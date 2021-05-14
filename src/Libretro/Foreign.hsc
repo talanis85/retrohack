@@ -100,7 +100,7 @@ foreign import ccall "dynamic" retro_get_memory_size
 
 type Wrap a = a -> IO (FunPtr a)
 
-type RetroEnvironmentT = CUInt -> Ptr () -> IO CInt
+type RetroEnvironmentT = RetroEnvironment -> Ptr () -> IO CInt
 foreign import ccall "wrapper" retro_environment_t
   :: Wrap RetroEnvironmentT
 
@@ -125,6 +125,68 @@ foreign import ccall "wrapper" retro_input_state_t
   :: Wrap RetroInputStateT
 
 -- lots are missing
+
+-- Enums --------------------------------------------------------------------
+
+-- RETRO_ENVIRONMENT_*
+
+newtype RetroEnvironment = RetroEnvironment { getRetroEnvironment :: CInt }
+  deriving (Eq, Show, Storable)
+
+#{enum RetroEnvironment, RetroEnvironment
+ , retroEnvironmentExperimental = RETRO_ENVIRONMENT_EXPERIMENTAL
+ , retroEnvironmentPrivate = RETRO_ENVIRONMENT_PRIVATE
+ , retroEnvironmentSetRotation = RETRO_ENVIRONMENT_SET_ROTATION
+ , retroEnvironmentGetOverscan = RETRO_ENVIRONMENT_GET_OVERSCAN
+ , retroEnvironmentGetCanDupe = RETRO_ENVIRONMENT_GET_CAN_DUPE
+ , retroEnvironmentSetMessage = RETRO_ENVIRONMENT_SET_MESSAGE
+ , retroEnvironmentShutdown = RETRO_ENVIRONMENT_SHUTDOWN
+ , retroEnvironmentSetPerformanceLevel = RETRO_ENVIRONMENT_SET_PERFORMANCE_LEVEL
+ , retroEnvironmentGetSystemDirectory = RETRO_ENVIRONMENT_GET_SYSTEM_DIRECTORY
+ , retroEnvironmentSetPixelFormat = RETRO_ENVIRONMENT_SET_PIXEL_FORMAT
+ , retroEnvironmentSetInputDescriptors = RETRO_ENVIRONMENT_SET_INPUT_DESCRIPTORS
+ , retroEnvironmentSetKeyboardCallback = RETRO_ENVIRONMENT_SET_KEYBOARD_CALLBACK
+ , retroEnvironmentSetDiskControlInterface = RETRO_ENVIRONMENT_SET_DISK_CONTROL_INTERFACE
+ , retroEnvironmentSetHwRender = RETRO_ENVIRONMENT_SET_HW_RENDER
+ , retroEnvironmentGetVariable = RETRO_ENVIRONMENT_GET_VARIABLE
+ , retroEnvironmentSetVariables = RETRO_ENVIRONMENT_SET_VARIABLES
+ , retroEnvironmentGetVariableUpdate = RETRO_ENVIRONMENT_GET_VARIABLE_UPDATE
+ , retroEnvironmentSetSupportNoGame = RETRO_ENVIRONMENT_SET_SUPPORT_NO_GAME
+ , retroEnvironmentGetLibretroPath = RETRO_ENVIRONMENT_GET_LIBRETRO_PATH
+ , retroEnvironmentSetAudioCallback = RETRO_ENVIRONMENT_SET_AUDIO_CALLBACK
+ , retroEnvironmentSetFrameTimeCallback = RETRO_ENVIRONMENT_SET_FRAME_TIME_CALLBACK
+ , retroEnvironmentGetRumbleInterface = RETRO_ENVIRONMENT_GET_RUMBLE_INTERFACE
+ , retroEnvironmentGetInputDeviceCapabilities = RETRO_ENVIRONMENT_GET_INPUT_DEVICE_CAPABILITIES
+ , retroEnvironmentGetSensorInterface = RETRO_ENVIRONMENT_GET_SENSOR_INTERFACE
+ , retroEnvironmentGetCameraInterface = RETRO_ENVIRONMENT_GET_CAMERA_INTERFACE
+ , retroEnvironmentGetLogInterface = RETRO_ENVIRONMENT_GET_LOG_INTERFACE
+ , retroEnvironmentGetPerfInterface = RETRO_ENVIRONMENT_GET_PERF_INTERFACE
+ , retroEnvironmentGetLocationInterface = RETRO_ENVIRONMENT_GET_LOCATION_INTERFACE
+ , retroEnvironmentGetContentDirectory = RETRO_ENVIRONMENT_GET_CONTENT_DIRECTORY
+ , retroEnvironmentGetCoreAssetsDirectory = RETRO_ENVIRONMENT_GET_CORE_ASSETS_DIRECTORY
+ , retroEnvironmentGetSaveDirectory = RETRO_ENVIRONMENT_GET_SAVE_DIRECTORY
+ , retroEnvironmentSetSystemAvInfo = RETRO_ENVIRONMENT_SET_SYSTEM_AV_INFO
+ , retroEnvironmentSetProcAddressCallback = RETRO_ENVIRONMENT_SET_PROC_ADDRESS_CALLBACK
+ , retroEnvironmentSetSubsystemInfo = RETRO_ENVIRONMENT_SET_SUBSYSTEM_INFO
+ , retroEnvironmentSetControllerInfo = RETRO_ENVIRONMENT_SET_CONTROLLER_INFO
+ , retroEnvironmentSetMemoryMaps = RETRO_ENVIRONMENT_SET_MEMORY_MAPS
+ , retroEnvironmentSetGeometry = RETRO_ENVIRONMENT_SET_GEOMETRY
+ , retroEnvironmentGetUsername = RETRO_ENVIRONMENT_GET_USERNAME
+ , retroEnvironmentGetLanguage = RETRO_ENVIRONMENT_GET_LANGUAGE
+ , retroEnvironmentGetCurrentSoftwareFramebuffer = RETRO_ENVIRONMENT_GET_CURRENT_SOFTWARE_FRAMEBUFFER
+ }
+
+-- retro_pixel_format
+
+newtype RetroPixelFormat = RetroPixelFormat { getRetroPixelFormat :: CInt }
+  deriving (Eq, Show, Storable)
+
+#{enum RetroPixelFormat, RetroPixelFormat
+  , retroPixelFormat0RGB1555 = RETRO_PIXEL_FORMAT_0RGB1555
+  , retroPixelFormatXRGB8888 = RETRO_PIXEL_FORMAT_XRGB8888
+  , retroPixelFormatRGB565 = RETRO_PIXEL_FORMAT_RGB565
+  , retroPixelFormatUnknown = RETRO_PIXEL_FORMAT_UNKNOWN
+  }
 
 -- Structs ------------------------------------------------------------------
 
@@ -175,10 +237,10 @@ instance Storable RetroSystemAvInfo where
 -- retro_game_geometry
 
 data RetroGameGeometry = RetroGameGeometry
-  { retroGameGeometryBaseWidth :: Word
-  , retroGameGeometryBaseHeight :: Word
-  , retroGameGeometryMaxWidth :: Word
-  , retroGameGeometryMaxHeight :: Word
+  { retroGameGeometryBaseWidth :: Word32
+  , retroGameGeometryBaseHeight :: Word32
+  , retroGameGeometryMaxWidth :: Word32
+  , retroGameGeometryMaxHeight :: Word32
   , retroGameGeometryAspectRatio :: Float
   } deriving (Eq, Show)
 

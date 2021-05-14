@@ -1,11 +1,14 @@
 resolver: lts-16.31
 packages:
 - .
-# extra-deps: []
+extra-deps:
+- gl3w-0.1.0
 nix:
   enable: true
   packages:
     - libGL
+    - libGLU
+    - glfw3
     - xorg.libX11
     - xorg.libXi
     - xorg.libXrandr

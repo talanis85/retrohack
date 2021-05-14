@@ -17,7 +17,6 @@ description:         Please see the README on GitHub at <https://github.com/tala
 
 dependencies:
 - base >= 4.7 && < 5
-- array
 - mtl
 
 library:
@@ -40,7 +39,10 @@ executables:
     dependencies:
     - retrohack
     - bytestring
+    - gl3w
     - GLFW-b
+    - lens
+    - OpenGL
     - unix
 
 tests:

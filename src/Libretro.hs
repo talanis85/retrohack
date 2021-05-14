@@ -5,14 +5,16 @@ module Libretro
   , RetroM
   , withCore
 
-  , RetroEnvironment (..)
-  , defaultRetroEnvironment
+  , RetroEnvironmentHandlers (..)
+  , defaultRetroEnvironmentHandlers
 
   , retroApiVersion
   , retroDeinit
   , retroGetSystemInfo
+  , retroGetSystemAvInfo
   , retroInit
   , retroLoadGame
+  , retroRun
   , retroSetEnvironment
   , retroSetAudioSample
   , retroSetAudioSampleBatch
@@ -21,9 +23,15 @@ module Libretro
   , retroSetVideoRefresh
 
   , RetroGameInfo (..)
+  , RetroGameGeometry (..)
   , RetroSystemInfo (..)
+  , RetroSystemAvInfo (..)
+  , RetroPixelFormat
+  , retroPixelFormat0RGB1555
+  , retroPixelFormatXRGB8888
+  , retroPixelFormatRGB565
 
-  , PixelData
+  , PixelPtr
   , RetroVideoRefresh
   , RetroInputPoll
   , RetroInputState
@@ -105,9 +113,9 @@ loadCore fp = do
 
   return $ RetroCore { .. }
 
-type PixelData = Ptr Word8
+type PixelPtr = Ptr Word8
 
-type RetroVideoRefresh = PixelData -> Word -> Word -> Word -> RetroM ()
+type RetroVideoRefresh = PixelPtr -> Word32 -> Word32 -> Word32 -> RetroM ()
 
 makeRetroVideoRefresh :: RetroCore -> RetroVideoRefresh -> RetroVideoRefreshT
 makeRetroVideoRefresh core f = \dat width height pitch -> do
@@ -119,7 +127,7 @@ makeRetroInputPoll :: RetroCore -> RetroInputPoll -> RetroInputPollT
 makeRetroInputPoll core f = do
   runReaderT f core
 
-type RetroInputState = Word -> Word -> Word -> Word -> RetroM Int16
+type RetroInputState = Word32 -> Word32 -> Word32 -> Word32 -> RetroM Int16
 
 makeRetroInputState :: RetroCore -> RetroInputState -> RetroInputStateT
 makeRetroInputState core f = \port device index id -> do
@@ -132,28 +140,30 @@ makeRetroAudioSample :: RetroCore -> RetroAudioSample -> RetroAudioSampleT
 makeRetroAudioSample core f = \left right -> do
   runReaderT (f (fromIntegral left) (fromIntegral right)) core
 
-type RetroAudioSampleBatch = [Int16] -> RetroM Word
+type RetroAudioSampleBatch = [Int16] -> RetroM Word64
 
 makeRetroAudioSampleBatch :: RetroCore -> RetroAudioSampleBatch -> RetroAudioSampleBatchT
 makeRetroAudioSampleBatch core f = \dat frames -> do
   values <- peekArray (fromIntegral frames) dat
   fromIntegral <$> runReaderT (f (fromIntegral <$> values)) core
 
-withCore :: FilePath -> RetroEnvironment -> RetroM a -> IO a
-withCore fp env action = do
+withCore :: FilePath -> RetroM a -> IO a
+withCore fp action = do
   core <- loadCore fp
   r <- runReaderT action core
   return r
 
-makeRetroEnvironmentCallback :: RetroCore -> RetroEnvironment -> RetroEnvironmentT
+makeRetroEnvironmentCallback :: RetroCore -> RetroEnvironmentHandlers -> RetroEnvironmentT
 makeRetroEnvironmentCallback core env key dat
-  | key == 27 = do
+  | key == retroEnvironmentGetLogInterface = do
       let logfun = default_retro_log_printf
       let logcb = RetroLogCallback
             { retroLogCallbackLog = logfun
             }
       poke (castPtr dat) logcb
       return 1
+  | key == retroEnvironmentSetPixelFormat = runSetter retroEnvironmentHandlersSetPixelFormat
+  | key == retroEnvironmentGetCanDupe = runGetter retroEnvironmentHandlersGetCanDupe
   | otherwise = return 0
   where
     runGetter field = do
@@ -162,15 +172,17 @@ makeRetroEnvironmentCallback core env key dat
       return 1
     runSetter field = do
       x <- peek (castPtr dat)
-      runReaderT (field env x) core
-      return 1
+      r <- runReaderT (field env x) core
+      return (if r then 1 else 0)
 
-data RetroEnvironment = RetroEnvironment
-  { retroEnvironmentGetCanDupe :: RetroM Bool
+data RetroEnvironmentHandlers = RetroEnvironmentHandlers
+  { retroEnvironmentHandlersGetCanDupe :: RetroM Bool
+  , retroEnvironmentHandlersSetPixelFormat :: RetroPixelFormat -> RetroM Bool
   }
 
-defaultRetroEnvironment = RetroEnvironment
-  { retroEnvironmentGetCanDupe = return False
+defaultRetroEnvironmentHandlers = RetroEnvironmentHandlers
+  { retroEnvironmentHandlersGetCanDupe = return False
+  , retroEnvironmentHandlersSetPixelFormat = const (return False)
   }
 
 runCore :: (RetroCore -> IO a) -> RetroM a
@@ -185,11 +197,17 @@ retroDeinit = runCore _retroDeinit
 retroGetSystemInfo :: RetroM RetroSystemInfo
 retroGetSystemInfo = runCore $ \core -> alloca $ \p -> _retroGetSystemInfo core p >> peek p
 
+retroGetSystemAvInfo :: RetroM RetroSystemAvInfo
+retroGetSystemAvInfo = runCore $ \core -> alloca $ \p -> _retroGetSystemAvInfo core p >> peek p
+
 retroInit :: RetroM ()
 retroInit = runCore _retroInit
 
 retroLoadGame :: RetroGameInfo -> RetroM ()
 retroLoadGame gameInfo = runCore $ \core -> with gameInfo $ \p -> _retroLoadGame core p >> return ()
+
+retroRun :: RetroM ()
+retroRun = runCore _retroRun
 
 retroSetAudioSample :: RetroAudioSample -> RetroM ()
 retroSetAudioSample f = runCore $ \core -> do
@@ -203,7 +221,7 @@ retroSetAudioSampleBatch f = runCore $ \core -> do
   _retroSetAudioSampleBatch core cb
   return ()
 
-retroSetEnvironment :: RetroEnvironment -> RetroM ()
+retroSetEnvironment :: RetroEnvironmentHandlers -> RetroM ()
 retroSetEnvironment env = runCore $ \core -> do
   cb <- retro_environment_t (makeRetroEnvironmentCallback core env)
   _retroSetEnvironment core cb

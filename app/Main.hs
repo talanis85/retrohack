@@ -3,67 +3,69 @@ module Main where
 import Control.Monad
 import Control.Monad.Trans
 import qualified Data.ByteString as BS
-import qualified Graphics.UI.GLFW as GLFW
+import Data.Word
 import System.Environment
 import System.Posix.DynamicLinker
 import System.IO
 import System.IO.Error
 import Text.Printf
 
+import Log
 import Libretro
-
-printLog :: String -> IO ()
-printLog = putStrLn
+import Video
 
 main :: IO ()
 main = do
   args <- getArgs
 
-  -- Initialize GLFW
-  glfwInitSuccess <- GLFW.init
-  when (not glfwInitSuccess) $ ioError $ userError "Could not initialize GLFW"
+  video <- initVideo
 
-  -- Load the libretro core
-  withCore (args !! 0) defaultRetroEnvironment $ do
+  withCore (args !! 0) $ do
     av <- retroApiVersion
     liftIO $ printLog $ printf "libretro API version: %d" av
 
     sysinfo <- retroGetSystemInfo
-    liftIO $ printLog $ show sysinfo
+    liftIO $ printLog $ printf "Core name: %s" (retroSystemInfoLibraryName sysinfo)
+    liftIO $ printLog $ printf "Core version: %s" (retroSystemInfoLibraryVersion sysinfo)
 
-    retroSetEnvironment defaultRetroEnvironment
-    retroSetVideoRefresh videoRefresh
+    let environmentHandlers = defaultRetroEnvironmentHandlers
+          { retroEnvironmentHandlersSetPixelFormat = videoSetPixelFormat video
+          }
+
+    retroSetEnvironment environmentHandlers
+    retroSetVideoRefresh (videoRefresh video)
     retroSetInputPoll inputPoll
     retroSetInputState inputState
     retroSetAudioSample audioSample
     retroSetAudioSampleBatch audioSampleBatch
 
-    liftIO $ printLog "Done installing callbacks"
-
     retroInit
-
-    liftIO $ printLog "Done initializing"
 
     gameInfo <- loadGameInfo (args !! 1)
     retroLoadGame gameInfo
 
-    {-
-    gameInfo <- loadGameInfo core (args !! 1)
-    retroLoadGame core gameInfo
+    avInfo <- retroGetSystemAvInfo
 
-    retroSetEnvironment core environmentCallback
-    -}
+    liftIO $ printLog $ "Game geometry:"
+    liftIO $ printLog $ printf "  base dimensions: %s * %s"
+      (show (retroGameGeometryBaseWidth (retroSystemAvInfoGeometry avInfo)))
+      (show (retroGameGeometryBaseHeight (retroSystemAvInfoGeometry avInfo)))
+    liftIO $ printLog $ printf "  max dimensions: %s * %s"
+      (show (retroGameGeometryMaxWidth (retroSystemAvInfoGeometry avInfo)))
+      (show (retroGameGeometryMaxHeight (retroSystemAvInfoGeometry avInfo)))
+    liftIO $ printLog $ printf "  aspect ratio: %s"
+      (show (retroGameGeometryAspectRatio (retroSystemAvInfoGeometry avInfo)))
 
-{-
-environmentCallback :: LibretroEnvironment -> Ptr () -> IO CInt
-environmentCallback env dat
-  | key == c'RETRO_ENVIRONMENT_GET_LOG_INTERFACE = do
-      logfun <- default_retro_log_printf
-      let logcb = C'retro_log_callback logfun
-      poke (castPtr dat) logcb
-      return 1
-  | otherwise = return 0
--}
+    liftIO $ configureVideo video (retroSystemAvInfoGeometry avInfo)
+
+    let loop = do
+          retroRun
+          liftIO $ videoRender video
+
+          shouldClose <- liftIO $ windowShouldClose video
+          if shouldClose then return () else loop
+
+    loop
 
 loadGameInfo :: FilePath -> RetroM RetroGameInfo
 loadGameInfo fp = do
@@ -80,17 +82,14 @@ loadGameInfo fp = do
     , retroGameInfoMeta = ""
     }
 
-videoRefresh :: PixelData -> Word -> Word -> Word -> RetroM ()
-videoRefresh dat width height pitch = return ()
-
 inputPoll :: RetroM ()
 inputPoll = return ()
 
-inputState :: Word -> Word -> Word -> Word -> RetroM Int16
+inputState :: Word32 -> Word32 -> Word32 -> Word32 -> RetroM Int16
 inputState port device index id = return 0
 
 audioSample :: Int16 -> Int16 -> RetroM ()
 audioSample left right = return ()
 
-audioSampleBatch :: [Int16] -> RetroM Word
+audioSampleBatch :: [Int16] -> RetroM Word64
 audioSampleBatch dat = return 0
