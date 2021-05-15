@@ -120,7 +120,7 @@ type RetroInputPollT = IO ()
 foreign import ccall "wrapper" retro_input_poll_t
   :: Wrap RetroInputPollT
 
-type RetroInputStateT = CUInt -> CUInt -> CUInt -> CUInt -> IO CShort
+type RetroInputStateT = CUInt -> RetroDevice -> CUInt -> CUInt -> IO CShort
 foreign import ccall "wrapper" retro_input_state_t
   :: Wrap RetroInputStateT
 
@@ -186,6 +186,45 @@ newtype RetroPixelFormat = RetroPixelFormat { getRetroPixelFormat :: CInt }
   , retroPixelFormatXRGB8888 = RETRO_PIXEL_FORMAT_XRGB8888
   , retroPixelFormatRGB565 = RETRO_PIXEL_FORMAT_RGB565
   , retroPixelFormatUnknown = RETRO_PIXEL_FORMAT_UNKNOWN
+  }
+
+-- RETRO_DEVICE
+
+newtype RetroDevice = RetroDevice { getRetroDevice :: CUInt }
+  deriving (Eq, Show, Ord, Storable)
+
+#{enum RetroDevice, RetroDevice
+  , retroDeviceNone = RETRO_DEVICE_NONE
+  , retroDeviceJoypad = RETRO_DEVICE_JOYPAD
+  , retroDeviceMouse = RETRO_DEVICE_MOUSE
+  , retroDeviceKeyboard = RETRO_DEVICE_KEYBOARD
+  , retroDeviceLightgun = RETRO_DEVICE_LIGHTGUN
+  , retroDeviceAnalog = RETRO_DEVICE_ANALOG
+  , retroDevicePointer = RETRO_DEVICE_POINTER
+  }
+
+-- RETRO_DEVICE_ID_JOYPAD
+
+newtype RetroDeviceIdJoypad = RetroDeviceIdJoypad { getRetroDeviceIdJoypad :: CUInt }
+  deriving (Eq, Enum, Num, Real, Integral, Show, Ord, Storable)
+
+#{enum RetroDeviceIdJoypad, RetroDeviceIdJoypad
+  , retroDeviceIdJoypadB = RETRO_DEVICE_ID_JOYPAD_B
+  , retroDeviceIdJoypadY = RETRO_DEVICE_ID_JOYPAD_Y
+  , retroDeviceIdJoypadSelect = RETRO_DEVICE_ID_JOYPAD_SELECT
+  , retroDeviceIdJoypadStart = RETRO_DEVICE_ID_JOYPAD_START
+  , retroDeviceIdJoypadUp = RETRO_DEVICE_ID_JOYPAD_UP
+  , retroDeviceIdJoypadDown = RETRO_DEVICE_ID_JOYPAD_DOWN
+  , retroDeviceIdJoypadLeft = RETRO_DEVICE_ID_JOYPAD_LEFT
+  , retroDeviceIdJoypadRight = RETRO_DEVICE_ID_JOYPAD_RIGHT
+  , retroDeviceIdJoypadA = RETRO_DEVICE_ID_JOYPAD_A
+  , retroDeviceIdJoypadX = RETRO_DEVICE_ID_JOYPAD_X
+  , retroDeviceIdJoypadL = RETRO_DEVICE_ID_JOYPAD_L
+  , retroDeviceIdJoypadR = RETRO_DEVICE_ID_JOYPAD_R
+  , retroDeviceIdJoypadL2 = RETRO_DEVICE_ID_JOYPAD_L2
+  , retroDeviceIdJoypadR2 = RETRO_DEVICE_ID_JOYPAD_R2
+  , retroDeviceIdJoypadL3 = RETRO_DEVICE_ID_JOYPAD_L3
+  , retroDeviceIdJoypadR3 = RETRO_DEVICE_ID_JOYPAD_R3
   }
 
 -- Structs ------------------------------------------------------------------

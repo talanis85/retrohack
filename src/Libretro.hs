@@ -40,6 +40,33 @@ module Libretro
   , RetroAudioSample
   , RetroAudioSampleBatch
 
+  , RetroDevice
+  , retroDeviceNone
+  , retroDeviceJoypad
+  , retroDeviceMouse
+  , retroDeviceKeyboard
+  , retroDeviceLightgun
+  , retroDeviceAnalog
+  , retroDevicePointer
+
+  , RetroDeviceIdJoypad
+  , retroDeviceIdJoypadB
+  , retroDeviceIdJoypadY
+  , retroDeviceIdJoypadSelect
+  , retroDeviceIdJoypadStart
+  , retroDeviceIdJoypadUp
+  , retroDeviceIdJoypadDown
+  , retroDeviceIdJoypadLeft
+  , retroDeviceIdJoypadRight
+  , retroDeviceIdJoypadA
+  , retroDeviceIdJoypadX
+  , retroDeviceIdJoypadL
+  , retroDeviceIdJoypadR
+  , retroDeviceIdJoypadL2
+  , retroDeviceIdJoypadR2
+  , retroDeviceIdJoypadL3
+  , retroDeviceIdJoypadR3
+
   -- * Re-exports
   , Int16
   ) where
@@ -132,12 +159,12 @@ makeRetroInputPoll :: RetroCore -> RetroInputPoll -> RetroInputPollT
 makeRetroInputPoll core f = do
   runReaderT f core
 
-type RetroInputState = Word32 -> Word32 -> Word32 -> Word32 -> RetroM Int16
+type RetroInputState = Word32 -> RetroDevice -> Word32 -> Word32 -> RetroM Int16
 
 makeRetroInputState :: RetroCore -> RetroInputState -> RetroInputStateT
 makeRetroInputState core f = \port device index id -> do
   fromIntegral <$>
-    runReaderT (f (fromIntegral port) (fromIntegral device) (fromIntegral index) (fromIntegral id)) core
+    runReaderT (f (fromIntegral port) device (fromIntegral index) (fromIntegral id)) core
 
 type RetroAudioSample = Int16 -> Int16 -> RetroM ()
 

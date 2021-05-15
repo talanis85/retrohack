@@ -118,8 +118,8 @@ cmdLoadgame = commandP "loadgame" "<path>" $ do
     liftIO $ runRetroM core $ do
       retroSetEnvironment environmentHandlers
       retroSetVideoRefresh (videoRefresh video)
-      retroSetInputPoll inputPoll
-      retroSetInputState inputState
+      retroSetInputPoll (videoInputPoll defaultInputMappings video)
+      retroSetInputState (videoInputState video)
       retroSetAudioSample audioSample
       retroSetAudioSampleBatch audioSampleBatch
       retroInit
@@ -184,12 +184,6 @@ loadGameInfo fp = do
     , retroGameInfoData = infoData
     , retroGameInfoMeta = ""
     }
-
-inputPoll :: RetroM ()
-inputPoll = return ()
-
-inputState :: Word32 -> Word32 -> Word32 -> Word32 -> RetroM Int16
-inputState port device index id = return 0
 
 audioSample :: Int16 -> Int16 -> RetroM ()
 audioSample left right = return ()

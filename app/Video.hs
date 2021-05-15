@@ -8,12 +8,16 @@ module Video
   , videoRender
   , videoSetPixelFormat
   , windowShouldClose
+  , videoInputPoll
+  , videoInputState
+  , defaultInputMappings
   ) where
 
 import Control.Lens
 import Control.Monad
 import Control.Monad.Trans
 import Data.IORef
+import qualified Data.Map as Map
 import Foreign
 import Graphics.Rendering.OpenGL
 import qualified Graphics.UI.GLFW as GLFW
@@ -35,6 +39,7 @@ data VideoState = VideoState
   , _videoStateTextureSize :: (Word32, Word32)
   , _videoStateTextureCoords :: Ptr (TexCoord2 GLfloat)
   , _videoStateVertex :: Ptr (Vertex2 GLfloat)
+  , _videoStateInput :: Map.Map (Word32, RetroDeviceIdJoypad) Int16
   }
 
 makeLenses ''VideoConfig
@@ -111,6 +116,7 @@ configureVideo vsRef geometry = liftIO $ readIORef vsRef >>= configureVideo'
             , _videoStateTextureSize = (textureWidth, textureHeight)
             , _videoStateTextureCoords = coordsPointer
             , _videoStateVertex = vertexPointer
+            , _videoStateInput = Map.empty
             }
 
       printLog $ "Video configuration:"
@@ -284,3 +290,53 @@ getBpp format
   | format == retroPixelFormatXRGB8888 = 4
   | format == retroPixelFormatRGB565 = 2
   | otherwise = error "Invalid pixel format"
+
+data GLFWControl = KeyControl GLFW.Key | GamepadButtonControl GLFW.Joystick GLFW.GamepadButton
+
+defaultInputMappings :: [(GLFWControl, Word32, RetroDeviceIdJoypad)]
+defaultInputMappings =
+  -- The Xbox controller is so wrong here!
+  [ (GamepadButtonControl GLFW.Joystick'1 GLFW.GamepadButton'A, 0, retroDeviceIdJoypadB)
+  , (GamepadButtonControl GLFW.Joystick'1 GLFW.GamepadButton'B, 0, retroDeviceIdJoypadA)
+  , (GamepadButtonControl GLFW.Joystick'1 GLFW.GamepadButton'X, 0, retroDeviceIdJoypadY)
+  , (GamepadButtonControl GLFW.Joystick'1 GLFW.GamepadButton'Y, 0, retroDeviceIdJoypadX)
+  , (GamepadButtonControl GLFW.Joystick'1 GLFW.GamepadButton'Start, 0, retroDeviceIdJoypadStart)
+  , (GamepadButtonControl GLFW.Joystick'1 GLFW.GamepadButton'Back, 0, retroDeviceIdJoypadSelect)
+  , (GamepadButtonControl GLFW.Joystick'1 GLFW.GamepadButton'LeftBumper, 0, retroDeviceIdJoypadL)
+  , (GamepadButtonControl GLFW.Joystick'1 GLFW.GamepadButton'RightBumper, 0, retroDeviceIdJoypadR)
+  , (GamepadButtonControl GLFW.Joystick'1 GLFW.GamepadButton'DpadUp, 0, retroDeviceIdJoypadUp)
+  , (GamepadButtonControl GLFW.Joystick'1 GLFW.GamepadButton'DpadDown, 0, retroDeviceIdJoypadDown)
+  , (GamepadButtonControl GLFW.Joystick'1 GLFW.GamepadButton'DpadLeft, 0, retroDeviceIdJoypadLeft)
+  , (GamepadButtonControl GLFW.Joystick'1 GLFW.GamepadButton'DpadRight, 0, retroDeviceIdJoypadRight)
+  ]
+
+videoInputPoll :: [(GLFWControl, Word32, RetroDeviceIdJoypad)] -> Video -> RetroM ()
+videoInputPoll binds vsRef = liftIO $ readIORef vsRef >>= videoInputPoll'
+  where
+    videoInputPoll' (config, Nothing) = return ()
+    videoInputPoll' (config, Just vs) = forM_ binds $ \(ctl, port, devid) -> do
+      value <- pollControl (vs ^. videoStateWindow) ctl
+      modifyIORef vsRef $ _2 . traversed . videoStateInput %~ Map.insert (port, devid) value
+
+pollControl :: GLFW.Window -> GLFWControl -> IO Int16
+pollControl window (KeyControl x) = do
+  s <- GLFW.getKey window x
+  if s == GLFW.KeyState'Released then return 0 else return 1
+pollControl window (GamepadButtonControl joystick button) = do
+  s <- GLFW.getGamepadState joystick
+  case s of
+    Nothing -> return 0
+    Just s' -> if GLFW.getButtonState s' button == GLFW.GamepadButtonState'Released
+      then return 0
+      else return 1
+
+videoInputState :: Video -> Word32 -> RetroDevice -> Word32 -> Word32 -> RetroM Int16
+videoInputState vsRef port device index id = liftIO $ readIORef vsRef >>= videoInputState'
+  where
+    videoInputState' (config, Nothing) = return 0
+    videoInputState' (config, Just vs) =
+      if device /= retroDeviceJoypad
+        then return 0
+        else case Map.lookup (port, fromIntegral id) (vs ^. videoStateInput) of
+          Nothing -> return 0
+          Just v -> return v
