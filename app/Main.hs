@@ -65,6 +65,7 @@ runCommand = parseCommand
   , cmdAvinfo
   , cmdLoadgame
   , cmdRun
+  , cmdExec
   , cmdPeek
   ]
 
@@ -168,6 +169,15 @@ cmdRun = commandP "run" "" $ do
     appCore . traversed . _2 .= CoreRunning
 
     output "Game is running"
+
+cmdExec :: Command
+cmdExec = commandP "exec" "<script>" $ do
+  path <- stringP
+  return $ do
+    file <- liftIO $ tryIO $ readFile path
+    case file of
+      Left err -> output $ printf "IOException: %s" (show err)
+      Right file' -> forM_ (lines file') $ runCommand
 
 cmdPeek :: Command
 cmdPeek = commandP "peek" "<type> <segment> <address>" $ do
