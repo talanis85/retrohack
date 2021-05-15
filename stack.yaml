@@ -6,6 +6,8 @@ extra-deps:
 nix:
   enable: true
   packages:
+    - alsaLib
+    - pkgconfig
     - libGL
     - libGLU
     - glfw3
@@ -16,3 +18,4 @@ nix:
     - xorg.libXcursor
     - xorg.libXinerama
     - xorg.libXext
+  pure: false

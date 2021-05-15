@@ -28,12 +28,12 @@ module Libretro
   , RetroGameGeometry (..)
   , RetroSystemInfo (..)
   , RetroSystemAvInfo (..)
+  , RetroSystemTiming (..)
   , RetroPixelFormat
   , retroPixelFormat0RGB1555
   , retroPixelFormatXRGB8888
   , retroPixelFormatRGB565
 
-  , PixelPtr
   , RetroVideoRefresh
   , RetroInputPoll
   , RetroInputState
@@ -145,9 +145,7 @@ loadCore fp = do
 
   return $ RetroCore { .. }
 
-type PixelPtr = Ptr Word8
-
-type RetroVideoRefresh = PixelPtr -> Word32 -> Word32 -> Word32 -> RetroM ()
+type RetroVideoRefresh = Ptr () -> Word32 -> Word32 -> Word32 -> RetroM ()
 
 makeRetroVideoRefresh :: RetroCore -> RetroVideoRefresh -> RetroVideoRefreshT
 makeRetroVideoRefresh core f = \dat width height pitch -> do
@@ -172,12 +170,11 @@ makeRetroAudioSample :: RetroCore -> RetroAudioSample -> RetroAudioSampleT
 makeRetroAudioSample core f = \left right -> do
   runReaderT (f (fromIntegral left) (fromIntegral right)) core
 
-type RetroAudioSampleBatch = [Int16] -> RetroM Word64
+type RetroAudioSampleBatch = Ptr Int16 -> Word32 -> RetroM Word64
 
 makeRetroAudioSampleBatch :: RetroCore -> RetroAudioSampleBatch -> RetroAudioSampleBatchT
 makeRetroAudioSampleBatch core f = \dat frames -> do
-  values <- peekArray (fromIntegral frames) dat
-  fromIntegral <$> runReaderT (f (fromIntegral <$> values)) core
+  fromIntegral <$> runReaderT (f (castPtr dat) (fromIntegral frames)) core
 
 withCore :: FilePath -> RetroM a -> IO a
 withCore fp action = do

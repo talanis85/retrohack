@@ -41,6 +41,7 @@ executables:
     - -with-rtsopts=-N
     dependencies:
     - retrohack
+    - alsa-pcm
     - bytestring
     - gl3w
     - GLFW-b
@@ -48,6 +49,7 @@ executables:
     - lens
     - OpenGL
     - parsec
+    - sample-frame
     - stm
     - text
     - unix

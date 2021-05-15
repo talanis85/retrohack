@@ -17,6 +17,7 @@ import Text.Printf
 import AppM
 import Command
 import Libretro
+import Audio
 import Video
 
 makePrompt :: AppM String
@@ -38,8 +39,9 @@ makePrompt = do
 
 main :: IO ()
 main = do
+  audio <- initAudio
   video <- initVideo
-  state <- initAppState video
+  state <- initAppState audio video
   evalAppM (runInputT defaultSettings inputLoop) state
 
 inputLoop :: InputT AppM ()
@@ -109,6 +111,9 @@ cmdLoadgame :: Command
 cmdLoadgame = commandP "loadgame" "<path>" $ do
   path <- stringP
   return $ withLoadedCore [CoreFresh] $ \core -> do
+    avInfo <- liftIO $ runRetroM core retroGetSystemAvInfo
+
+    audio <- use appAudio
     video <- use appVideo
 
     let environmentHandlers = defaultRetroEnvironmentHandlers
@@ -120,8 +125,8 @@ cmdLoadgame = commandP "loadgame" "<path>" $ do
       retroSetVideoRefresh (videoRefresh video)
       retroSetInputPoll (videoInputPoll defaultInputMappings video)
       retroSetInputState (videoInputState video)
-      retroSetAudioSample audioSample
-      retroSetAudioSampleBatch audioSampleBatch
+      retroSetAudioSample (audioSample audio)
+      retroSetAudioSampleBatch (audioSampleBatch audio)
       retroInit
 
     result <- liftIO $ tryIO $ runRetroM core $ do
@@ -136,10 +141,12 @@ cmdRun :: Command
 cmdRun = do
   symbolP "run"
   return $ withLoadedCore [CoreInitialized] $ \core -> do
-    video <- use appVideo
-    taskQueue <- use appMainTasks
-
     avInfo <- liftIO $ runRetroM core retroGetSystemAvInfo
+
+    video <- use appVideo
+    audio <- use appAudio
+
+    taskQueue <- use appMainTasks
 
     let runLoop = do
           runRetroM core retroRun
@@ -152,6 +159,12 @@ cmdRun = do
             else runLoop
 
     liftIO $ forkIO $ do
+      audioResult <- tryIO $
+        configureAudio audio (floor (retroSystemTimingSampleRate (retroSystemAvInfoTiming avInfo)))
+      case audioResult of
+        Left err -> atomically $ writeTQueue taskQueue (output $ printf "IOException: %s" (show err))
+        Right () -> return ()
+
       configureVideo video (retroSystemAvInfoGeometry avInfo)
       runLoop
       deconfigureVideo video
@@ -184,9 +197,3 @@ loadGameInfo fp = do
     , retroGameInfoData = infoData
     , retroGameInfoMeta = ""
     }
-
-audioSample :: Int16 -> Int16 -> RetroM ()
-audioSample left right = return ()
-
-audioSampleBatch :: [Int16] -> RetroM Word64
-audioSampleBatch dat = return 0

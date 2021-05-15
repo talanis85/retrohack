@@ -7,6 +7,7 @@ module AppM
   , initAppState
   , appCore
   , appVideo
+  , appAudio
   , appPrint
   , appMainTasks
   , runAppTasks
@@ -18,6 +19,7 @@ import Control.Lens
 import Control.Monad.State.Strict
 
 import Libretro
+import Audio
 import Video
 
 type AppM = StateT AppState IO
@@ -31,6 +33,7 @@ data CoreState = CoreFresh | CoreInitialized | CoreRunning
 data AppState = AppState
   { _appCore :: Maybe (RetroCore, CoreState)
   , _appVideo :: Video
+  , _appAudio :: Audio
   , _appPrint :: String -> AppM ()
   , _appMainTasks :: TQueue (AppM ())
   }
@@ -48,13 +51,14 @@ runAppTasks = do
   tasks <- liftIO $ atomically $ flushTQueue taskQueue
   sequence_ tasks
 
-initAppState :: Video -> IO AppState
-initAppState video = do
+initAppState :: Audio -> Video -> IO AppState
+initAppState audio video = do
   taskQueue <- atomically newTQueue
 
   return AppState
     { _appCore = Nothing
     , _appVideo = video
+    , _appAudio = audio
     , _appPrint = liftIO . putStrLn
     , _appMainTasks = taskQueue
     }

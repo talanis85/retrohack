@@ -199,7 +199,7 @@ resizeCallback :: GLFW.Window -> Int -> Int -> IO ()
 resizeCallback window w h = do
   viewport $= (Position 0 0, Size (fromIntegral w) (fromIntegral h))
 
-videoRefresh :: Video -> PixelPtr -> Word32 -> Word32 -> Word32 -> RetroM ()
+videoRefresh :: Video -> Ptr () -> Word32 -> Word32 -> Word32 -> RetroM ()
 videoRefresh vsRef dat width height pitch = liftIO $ readIORef vsRef >>= videoRefresh'
   where
     videoRefresh' (config, Nothing) = return ()
