@@ -1,7 +1,9 @@
 {-# LANGUAGE TemplateHaskell #-}
 module Video
-  ( initVideo
+  ( Video
+  , initVideo
   , configureVideo
+  , deconfigureVideo
   , videoRefresh
   , videoRender
   , videoSetPixelFormat
@@ -123,6 +125,17 @@ configureVideo vsRef geometry = liftIO $ readIORef vsRef >>= configureVideo'
 
       refreshVertexData vsRef
 
+deconfigureVideo :: Video -> IO ()
+deconfigureVideo vsRef = liftIO $ readIORef vsRef >>= deconfigureVideo'
+  where
+    deconfigureVideo' (config, Nothing) = return ()
+    deconfigureVideo' (config, Just vs) = do
+      deleteObjectName (vs ^. videoStateTexture)
+      free (vs ^. videoStateVertex)
+      free (vs ^. videoStateTextureCoords)
+      GLFW.destroyWindow (vs ^. videoStateWindow)
+      writeIORef vsRef (config, Nothing)
+
 resizeToAspect :: RetroGameGeometry -> (Word32, Word32)
 resizeToAspect geometry = (dw, dh)
   where
@@ -233,7 +246,7 @@ videoRender vsRef = liftIO $ readIORef vsRef >>= videoRender'
 videoSetPixelFormat :: Video -> RetroPixelFormat -> RetroM Bool
 videoSetPixelFormat vsRef format = liftIO $ readIORef vsRef >>= videoSetPixelFormat'
   where
-    videoSetPixelFormat' (config, Just _) = error "SET_PIXEL_FORMAT called after initialization"
+    videoSetPixelFormat' (config, Just _) = return False
     videoSetPixelFormat' (config, Nothing)
       | format == retroPixelFormat0RGB1555 = do
           modifyIORef vsRef $ _1 . videoConfigPixelFormat .~ retroPixelFormat0RGB1555

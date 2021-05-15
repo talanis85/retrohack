@@ -18,6 +18,8 @@ description:         Please see the README on GitHub at <https://github.com/tala
 dependencies:
 - base >= 4.7 && < 5
 - mtl
+default-extensions:
+- OverloadedStrings
 
 library:
   source-dirs: src
@@ -41,8 +43,12 @@ executables:
     - bytestring
     - gl3w
     - GLFW-b
+    - haskeline
     - lens
     - OpenGL
+    - parsec
+    - stm
+    - text
     - unix
 
 tests:

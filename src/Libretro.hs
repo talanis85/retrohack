@@ -3,6 +3,8 @@
 module Libretro
   ( RetroCore
   , RetroM
+  , runRetroM
+  , loadCore
   , withCore
 
   , RetroEnvironmentHandlers (..)
@@ -52,6 +54,9 @@ import Libretro.Helpers
 import Libretro.Foreign
 
 type RetroM = ReaderT RetroCore IO
+
+runRetroM :: RetroCore -> RetroM a -> IO a
+runRetroM core m = runReaderT m core
 
 data RetroCore = RetroCore
   { _retroApiVersion :: IO CUInt

@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 4b5962608f95f60ca17e860be023733af5c907a263843a97f439766fbd893643
+-- hash: 6719fcc5440388a146dacba3bd3da577a57a0c8bf147cba2967dc87609371378
 
 name:           retrohack
 version:        0.1.0.0
@@ -36,6 +36,7 @@ library
       Paths_retrohack
   hs-source-dirs:
       src
+  default-extensions: OverloadedStrings
   include-dirs:
       include
   c-sources:
@@ -51,11 +52,14 @@ library
 executable retrohack
   main-is: Main.hs
   other-modules:
+      AppM
+      Command
       Log
       Video
       Paths_retrohack
   hs-source-dirs:
       app
+  default-extensions: OverloadedStrings
   ghc-options: -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       GLFW-b
@@ -63,9 +67,13 @@ executable retrohack
     , base >=4.7 && <5
     , bytestring
     , gl3w
+    , haskeline
     , lens
     , mtl
+    , parsec
     , retrohack
+    , stm
+    , text
     , unix
   default-language: Haskell2010
 
@@ -76,6 +84,7 @@ test-suite retrohack-test
       Paths_retrohack
   hs-source-dirs:
       test
+  default-extensions: OverloadedStrings
   ghc-options: -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       base >=4.7 && <5
