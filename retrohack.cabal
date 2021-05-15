@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: b594efc2c2561cb2bc46776c7f01dd0e48ec1b99792731737459fab37075e4ae
+-- hash: 4b5962608f95f60ca17e860be023733af5c907a263843a97f439766fbd893643
 
 name:           retrohack
 version:        0.1.0.0
@@ -37,9 +37,9 @@ library
   hs-source-dirs:
       src
   include-dirs:
-      c
+      include
   c-sources:
-      c/helpers.c
+      cbits/helpers.c
   build-tools:
       hsc2hs
   build-depends:

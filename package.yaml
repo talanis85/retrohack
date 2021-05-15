@@ -25,8 +25,8 @@ library:
     - unix
   build-tools:
     - hsc2hs
-  include-dirs: c
-  c-sources: c/helpers.c
+  include-dirs: include
+  c-sources: cbits/helpers.c
 
 executables:
   retrohack:
