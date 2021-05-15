@@ -91,10 +91,10 @@ foreign import ccall "dynamic" retro_get_region
   :: Dyn (IO CUInt)
 
 foreign import ccall "dynamic" retro_get_memory_data
-  :: Dyn (CUInt -> IO (Ptr ()))
+  :: Dyn (RetroMemory -> IO (Ptr ()))
 
 foreign import ccall "dynamic" retro_get_memory_size
-  :: Dyn (CUInt -> IO CSize)
+  :: Dyn (RetroMemory -> IO CSize)
 
 -- Callbacks ----------------------------------------------------------------
 
@@ -225,6 +225,18 @@ newtype RetroDeviceIdJoypad = RetroDeviceIdJoypad { getRetroDeviceIdJoypad :: CU
   , retroDeviceIdJoypadR2 = RETRO_DEVICE_ID_JOYPAD_R2
   , retroDeviceIdJoypadL3 = RETRO_DEVICE_ID_JOYPAD_L3
   , retroDeviceIdJoypadR3 = RETRO_DEVICE_ID_JOYPAD_R3
+  }
+
+-- RETRO_MEMORY
+
+newtype RetroMemory = RetroMemory { getRetroMemroy :: CUInt }
+  deriving (Eq, Show)
+
+#{enum RetroMemory, RetroMemory
+  , retroMemorySaveRam = RETRO_MEMORY_SAVE_RAM
+  , retroMemoryRtc = RETRO_MEMORY_RTC
+  , retroMemorySystemRam = RETRO_MEMORY_SYSTEM_RAM
+  , retroMemoryVideoRam = RETRO_MEMORY_VIDEO_RAM
   }
 
 -- Structs ------------------------------------------------------------------

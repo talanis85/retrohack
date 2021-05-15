@@ -12,6 +12,7 @@ module Libretro
 
   , retroApiVersion
   , retroDeinit
+  , retroGetMemoryData
   , retroGetSystemInfo
   , retroGetSystemAvInfo
   , retroInit
@@ -67,6 +68,13 @@ module Libretro
   , retroDeviceIdJoypadL3
   , retroDeviceIdJoypadR3
 
+  , RetroMemory
+  , retroMemorySaveRam
+  , retroMemoryRtc
+  , retroMemorySystemRam
+  , retroMemoryVideoRam
+  , module Libretro.MemoryData
+
   -- * Re-exports
   , Int16
   ) where
@@ -79,6 +87,7 @@ import System.Posix.DynamicLinker
 
 import Libretro.Helpers
 import Libretro.Foreign
+import Libretro.MemoryData
 
 type RetroM = ReaderT RetroCore IO
 
@@ -90,8 +99,8 @@ data RetroCore = RetroCore
   , _retroCheatReset :: IO ()
   , _retroCheatSet :: CUInt -> CInt -> CString -> IO ()
   , _retroDeinit :: IO ()
-  , _retroGetMemoryData :: CUInt -> IO (Ptr ())
-  , _retroGetMemorySize :: CUInt -> IO CSize
+  , _retroGetMemoryData :: RetroMemory -> IO (Ptr ())
+  , _retroGetMemorySize :: RetroMemory -> IO CSize
   , _retroGetRegion :: IO CUInt
   , _retroGetSystemInfo :: Ptr RetroSystemInfo -> IO ()
   , _retroGetSystemAvInfo :: Ptr RetroSystemAvInfo -> IO ()
@@ -222,6 +231,12 @@ retroApiVersion = fromIntegral <$> runCore _retroApiVersion
 
 retroDeinit :: RetroM ()
 retroDeinit = runCore _retroDeinit
+
+retroGetMemoryData :: RetroMemory -> RetroM MemoryData
+retroGetMemoryData segment = runCore $ \core -> do
+  ptr <- _retroGetMemoryData core segment
+  size <- _retroGetMemorySize core segment
+  return (memoryData (fromIntegral size) ptr)
 
 retroGetSystemInfo :: RetroM RetroSystemInfo
 retroGetSystemInfo = runCore $ \core -> alloca $ \p -> _retroGetSystemInfo core p >> peek p

@@ -3,6 +3,7 @@ module AppM
   ( AppM
   , evalAppM
   , CoreState (..)
+  , formatCoreState
   , AppState (..)
   , initAppState
   , appCore
@@ -27,8 +28,13 @@ type AppM = StateT AppState IO
 evalAppM :: AppM a -> AppState -> IO a
 evalAppM = evalStateT
 
-data CoreState = CoreFresh | CoreInitialized | CoreRunning
+data CoreState = CoreFresh | CoreStopped | CoreRunning
   deriving (Eq, Show)
+
+formatCoreState :: CoreState -> String
+formatCoreState CoreFresh = "loaded"
+formatCoreState CoreStopped = "stopped"
+formatCoreState CoreRunning = "running"
 
 data AppState = AppState
   { _appCore :: Maybe (RetroCore, CoreState)

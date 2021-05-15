@@ -4,6 +4,10 @@ module Command
   , commandP
   , symbolP
   , stringP
+  , addressP
+
+  -- * re-exports
+  , choice
   ) where
 
 import Text.Parsec
@@ -29,6 +33,7 @@ lexer = P.makeTokenParser haskellDef
 
 symbolP = try . P.symbol lexer
 stringP = P.stringLiteral lexer
+addressP = P.natural lexer
 
 commandP name doc p = do
   symbolP name

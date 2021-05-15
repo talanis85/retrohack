@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: a7560d98862118afbef4ee08a2d52e7fc3b2b83dcff6b1d48b2807b6d508c0f8
+-- hash: 55016e9c0c39753f426c91121bbad769faf8d004f1f74b42322028734ea1fb22
 
 name:           retrohack
 version:        0.1.0.0
@@ -32,6 +32,7 @@ library
       Libretro
       Libretro.Foreign
       Libretro.Helpers
+      Libretro.MemoryData
   other-modules:
       Paths_retrohack
   hs-source-dirs:

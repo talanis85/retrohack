@@ -31,11 +31,6 @@ makePrompt = do
         (retroSystemInfoLibraryName sysinfo)
         (retroSystemInfoLibraryVersion sysinfo)
         (formatCoreState corestate)
-  where
-    formatCoreState :: CoreState -> String
-    formatCoreState CoreFresh = "loaded"
-    formatCoreState CoreInitialized = "initialized"
-    formatCoreState CoreRunning = "running"
 
 main :: IO ()
 main = do
@@ -70,6 +65,7 @@ runCommand = parseCommand
   , cmdAvinfo
   , cmdLoadgame
   , cmdRun
+  , cmdPeek
   ]
 
 cmdLoadcore :: Command
@@ -85,7 +81,7 @@ cmdLoadcore = commandP "loadcore" "<path>" $ do
 
 cmdInfo :: Command
 cmdInfo = commandP "info" "" $ do
-  return $ withLoadedCore [CoreFresh, CoreInitialized, CoreRunning] $ \core -> do
+  return $ withLoadedCore [CoreFresh, CoreStopped, CoreRunning] $ \core -> do
     av <- liftIO $ runRetroM core retroApiVersion
     output $ printf "libretro API version: %d" av
 
@@ -95,7 +91,7 @@ cmdInfo = commandP "info" "" $ do
 
 cmdAvinfo :: Command
 cmdAvinfo = commandP "avinfo" "" $ do
-  return $ withLoadedCore [CoreFresh, CoreInitialized, CoreRunning] $ \core -> do
+  return $ withLoadedCore [CoreFresh, CoreStopped, CoreRunning] $ \core -> do
     avInfo <- liftIO $ runRetroM core retroGetSystemAvInfo
 
     output $ printf "Base dimensions: %s * %s"
@@ -135,12 +131,11 @@ cmdLoadgame = commandP "loadgame" "<path>" $ do
 
     case result of
       Left err -> output $ printf "IOException: %s" (show err)
-      Right () -> appCore . traversed . _2 .= CoreInitialized
+      Right () -> appCore . traversed . _2 .= CoreStopped
 
 cmdRun :: Command
-cmdRun = do
-  symbolP "run"
-  return $ withLoadedCore [CoreInitialized] $ \core -> do
+cmdRun = commandP "run" "" $ do
+  return $ withLoadedCore [CoreStopped] $ \core -> do
     avInfo <- liftIO $ runRetroM core retroGetSystemAvInfo
 
     video <- use appVideo
@@ -155,7 +150,7 @@ cmdRun = do
           shouldClose <- windowShouldClose video
           if shouldClose
             then atomically $ writeTQueue taskQueue $ do
-              appCore . traversed . _2 .= CoreInitialized
+              appCore . traversed . _2 .= CoreStopped
             else runLoop
 
     liftIO $ forkIO $ do
@@ -173,6 +168,31 @@ cmdRun = do
     appCore . traversed . _2 .= CoreRunning
 
     output "Game is running"
+
+cmdPeek :: Command
+cmdPeek = commandP "peek" "<type> <segment> <address>" $ do
+  peekMemory' <- choice
+    [ symbolP "i8"  >> return (peekMemoryMono peekMemoryI8)
+    , symbolP "i16" >> return (peekMemoryMono peekMemoryI16)
+    , symbolP "i32" >> return (peekMemoryMono peekMemoryI32)
+    , symbolP "u8"  >> return (peekMemoryMono peekMemoryU8)
+    , symbolP "u16" >> return (peekMemoryMono peekMemoryU16)
+    , symbolP "u32" >> return (peekMemoryMono peekMemoryU32)
+    ]
+  (segmentname, segment) <- choice
+    [ symbolP "sram" >> return ("sram", retroMemorySaveRam)
+    , symbolP "rtc" >> return ("rtc", retroMemoryRtc)
+    , symbolP "main" >> return ("main", retroMemorySystemRam)
+    , symbolP "video" >> return ("video", retroMemoryVideoRam)
+    ]
+  address <- fromIntegral <$> addressP
+  return $ withLoadedCore [CoreRunning] $ \core -> do
+    mdata <- liftIO $ runRetroM core (retroGetMemoryData segment)
+    value <- liftIO $ peekMemory' mdata address
+    case value of
+      Nothing -> output $ printf "0x%x = <out_of_bounds> sizeof(%s) = 0x%x (%d)"
+                            address (segmentname :: String) (memoryDataSize mdata) (memoryDataSize mdata)
+      Just value -> output $ printf "0x%x = 0x%x" address value
 
 withLoadedCore :: [CoreState] -> (RetroCore -> AppM ()) -> AppM ()
 withLoadedCore states f = do
