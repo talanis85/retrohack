@@ -182,10 +182,12 @@ cmdExec = commandP "exec" "<script>" $ do
 cmdPeek :: Command
 cmdPeek = commandP "peek" "<type> <segment> <address>" $ do
   peekMemory' <- choice
+    {-
     [ symbolP "i8"  >> return (peekMemoryMono peekMemoryI8)
     , symbolP "i16" >> return (peekMemoryMono peekMemoryI16)
     , symbolP "i32" >> return (peekMemoryMono peekMemoryI32)
-    , symbolP "u8"  >> return (peekMemoryMono peekMemoryU8)
+    -}
+    [ symbolP "u8"  >> return (peekMemoryMono peekMemoryU8)
     , symbolP "u16" >> return (peekMemoryMono peekMemoryU16)
     , symbolP "u32" >> return (peekMemoryMono peekMemoryU32)
     ]
