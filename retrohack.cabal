@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 55016e9c0c39753f426c91121bbad769faf8d004f1f74b42322028734ea1fb22
+-- hash: 6021f529fd7e234239ccf7347c9edc74f4ba82bb1ec2b5d2d9c3acb55051a887
 
 name:           retrohack
 version:        0.1.0.0
@@ -33,11 +33,12 @@ library
       Libretro.Foreign
       Libretro.Helpers
       Libretro.MemoryData
+      Retrohack.Memory
   other-modules:
       Paths_retrohack
   hs-source-dirs:
       src
-  default-extensions: OverloadedStrings
+  default-extensions: RankNTypes OverloadedStrings
   include-dirs:
       include
   c-sources:
@@ -47,6 +48,7 @@ library
   build-depends:
       base >=4.7 && <5
     , containers
+    , lens
     , mtl
     , unix
   default-language: Haskell2010
@@ -62,7 +64,7 @@ executable retrohack
       Paths_retrohack
   hs-source-dirs:
       app
-  default-extensions: OverloadedStrings
+  default-extensions: RankNTypes OverloadedStrings
   ghc-options: -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       GLFW-b
@@ -85,16 +87,22 @@ executable retrohack
 
 test-suite retrohack-test
   type: exitcode-stdio-1.0
-  main-is: Spec.hs
+  main-is: Main.hs
   other-modules:
+      Memory
       Paths_retrohack
   hs-source-dirs:
       test
-  default-extensions: OverloadedStrings
+  default-extensions: RankNTypes OverloadedStrings
   ghc-options: -threaded -rtsopts -with-rtsopts=-N
   build-depends:
-      base >=4.7 && <5
+      QuickCheck
+    , base >=4.7 && <5
     , containers
+    , lens
     , mtl
+    , quickcheck-instances
     , retrohack
+    , tasty
+    , tasty-quickcheck
   default-language: Haskell2010

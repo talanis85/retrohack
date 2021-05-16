@@ -5,7 +5,8 @@ module Command
   , symbolP
   , stringP
   , addressP
-  , valueP
+  , integerP
+  , typeP
 
   -- * re-exports
   , choice
@@ -17,6 +18,7 @@ import qualified Text.Parsec.Token as P
 import Text.Parsec.Language (haskellDef)
 
 import AppM
+import Retrohack.Memory
 
 type Command = Parsec String () (AppM ())
 
@@ -35,7 +37,15 @@ lexer = P.makeTokenParser haskellDef
 symbolP = try . P.symbol lexer
 stringP = P.stringLiteral lexer
 addressP = P.natural lexer
-valueP = P.natural lexer
+integerP = P.integer lexer
+typeP = choice
+  [ symbolP "i8" >> return I8
+  , symbolP "i16" >> return I16
+  , symbolP "i32" >> return I32
+  , symbolP "u8" >> return U8
+  , symbolP "u16" >> return U16
+  , symbolP "u32" >> return U32
+  ]
 
 commandP name doc p = do
   symbolP name

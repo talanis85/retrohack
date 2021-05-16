@@ -16,6 +16,7 @@ import Text.Printf
 
 import AppM
 import Command
+import Retrohack.Memory
 import Libretro
 import Audio
 import Video
@@ -182,16 +183,7 @@ cmdExec = commandP "exec" "<script>" $ do
 
 cmdPeek :: Command
 cmdPeek = commandP "peek" "<type> <segment> <address>" $ do
-  peekMemory' <- choice
-    {-
-    [ symbolP "i8"  >> return (peekMemoryMono peekMemoryI8)
-    , symbolP "i16" >> return (peekMemoryMono peekMemoryI16)
-    , symbolP "i32" >> return (peekMemoryMono peekMemoryI32)
-    -}
-    [ symbolP "u8"  >> return (peekMemoryMono peekMemoryU8)
-    , symbolP "u16" >> return (peekMemoryMono peekMemoryU16)
-    , symbolP "u32" >> return (peekMemoryMono peekMemoryU32)
-    ]
+  typ <- typeP
   (segmentname, segment) <- choice
     [ symbolP "sram" >> return ("sram", retroMemorySaveRam)
     , symbolP "rtc" >> return ("rtc", retroMemoryRtc)
@@ -202,24 +194,15 @@ cmdPeek = commandP "peek" "<type> <segment> <address>" $ do
   address <- fromIntegral <$> addressP
   return $ withLoadedCore [CoreRunning] $ \core -> do
     mdata <- liftIO $ runRetroM core (retroGetMemoryData segment)
-    value <- liftIO $ peekMemory' mdata address
+    value <- liftIO $ peekMemoryValue snesArch typ mdata address
     case value of
       Nothing -> output $ printf "0x%x = <out_of_bounds> sizeof(%s) = 0x%x (%d)"
                             address (segmentname :: String) (memoryDataSize mdata) (memoryDataSize mdata)
-      Just value -> output $ printf "0x%x = 0x%x" address value
+      Just value -> output $ printf "0x%x = %s" address (value ^. formatValue)
 
 cmdPoke :: Command
 cmdPoke = commandP "poke" "<type> <segment> <address> <value>" $ do
-  pokeMemory' <- choice
-    {-
-    [ symbolP "i8"  >> return (pokeMemoryMono pokeMemoryI8)
-    , symbolP "i16" >> return (pokeMemoryMono pokeMemoryI16)
-    , symbolP "i32" >> return (pokeMemoryMono pokeMemoryI32)
-    -}
-    [ symbolP "u8"  >> return (pokeMemoryMono pokeMemoryU8)
-    , symbolP "u16" >> return (pokeMemoryMono pokeMemoryU16)
-    , symbolP "u32" >> return (pokeMemoryMono pokeMemoryU32)
-    ]
+  typ <- typeP
   (segmentname, segment) <- choice
     [ symbolP "sram" >> return ("sram", retroMemorySaveRam)
     , symbolP "rtc" >> return ("rtc", retroMemoryRtc)
@@ -228,10 +211,10 @@ cmdPoke = commandP "poke" "<type> <segment> <address> <value>" $ do
     , symbolP "rom" >> return ("rom", retroMemoryRom)
     ]
   address <- fromIntegral <$> addressP
-  value <- fromIntegral <$> valueP
+  value <- fromIntegral <$> integerP
   return $ withLoadedCore [CoreRunning] $ \core -> do
     mdata <- liftIO $ runRetroM core (retroGetMemoryData segment)
-    liftIO $ pokeMemory' mdata address value
+    liftIO $ pokeMemoryInteger snesArch typ mdata address value
 
 withLoadedCore :: [CoreState] -> (RetroCore -> AppM ()) -> AppM ()
 withLoadedCore states f = do

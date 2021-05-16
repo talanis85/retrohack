@@ -18,8 +18,10 @@ description:         Please see the README on GitHub at <https://github.com/tala
 dependencies:
 - base >= 4.7 && < 5
 - containers
+- lens
 - mtl
 default-extensions:
+- RankNTypes
 - OverloadedStrings
 
 library:
@@ -46,7 +48,6 @@ executables:
     - gl3w
     - GLFW-b
     - haskeline
-    - lens
     - OpenGL
     - parsec
     - sample-frame
@@ -56,7 +57,7 @@ executables:
 
 tests:
   retrohack-test:
-    main:                Spec.hs
+    main:                Main.hs
     source-dirs:         test
     ghc-options:
     - -threaded
@@ -64,3 +65,7 @@ tests:
     - -with-rtsopts=-N
     dependencies:
     - retrohack
+    - QuickCheck
+    - quickcheck-instances
+    - tasty
+    - tasty-quickcheck
