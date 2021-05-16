@@ -73,6 +73,7 @@ module Libretro
   , retroMemoryRtc
   , retroMemorySystemRam
   , retroMemoryVideoRam
+  , retroMemoryRom
   , module Libretro.MemoryData
 
   -- * Re-exports

@@ -237,6 +237,7 @@ newtype RetroMemory = RetroMemory { getRetroMemroy :: CUInt }
   , retroMemoryRtc = RETRO_MEMORY_RTC
   , retroMemorySystemRam = RETRO_MEMORY_SYSTEM_RAM
   , retroMemoryVideoRam = RETRO_MEMORY_VIDEO_RAM
+  , retroMemoryRom = RETRO_MEMORY_ROM
   }
 
 -- Structs ------------------------------------------------------------------

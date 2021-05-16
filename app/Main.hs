@@ -67,6 +67,7 @@ runCommand = parseCommand
   , cmdRun
   , cmdExec
   , cmdPeek
+  , cmdPoke
   ]
 
 cmdLoadcore :: Command
@@ -196,6 +197,7 @@ cmdPeek = commandP "peek" "<type> <segment> <address>" $ do
     , symbolP "rtc" >> return ("rtc", retroMemoryRtc)
     , symbolP "main" >> return ("main", retroMemorySystemRam)
     , symbolP "video" >> return ("video", retroMemoryVideoRam)
+    , symbolP "rom" >> return ("rom", retroMemoryRom)
     ]
   address <- fromIntegral <$> addressP
   return $ withLoadedCore [CoreRunning] $ \core -> do
@@ -205,6 +207,31 @@ cmdPeek = commandP "peek" "<type> <segment> <address>" $ do
       Nothing -> output $ printf "0x%x = <out_of_bounds> sizeof(%s) = 0x%x (%d)"
                             address (segmentname :: String) (memoryDataSize mdata) (memoryDataSize mdata)
       Just value -> output $ printf "0x%x = 0x%x" address value
+
+cmdPoke :: Command
+cmdPoke = commandP "poke" "<type> <segment> <address> <value>" $ do
+  pokeMemory' <- choice
+    {-
+    [ symbolP "i8"  >> return (pokeMemoryMono pokeMemoryI8)
+    , symbolP "i16" >> return (pokeMemoryMono pokeMemoryI16)
+    , symbolP "i32" >> return (pokeMemoryMono pokeMemoryI32)
+    -}
+    [ symbolP "u8"  >> return (pokeMemoryMono pokeMemoryU8)
+    , symbolP "u16" >> return (pokeMemoryMono pokeMemoryU16)
+    , symbolP "u32" >> return (pokeMemoryMono pokeMemoryU32)
+    ]
+  (segmentname, segment) <- choice
+    [ symbolP "sram" >> return ("sram", retroMemorySaveRam)
+    , symbolP "rtc" >> return ("rtc", retroMemoryRtc)
+    , symbolP "main" >> return ("main", retroMemorySystemRam)
+    , symbolP "video" >> return ("video", retroMemoryVideoRam)
+    , symbolP "rom" >> return ("rom", retroMemoryRom)
+    ]
+  address <- fromIntegral <$> addressP
+  value <- fromIntegral <$> valueP
+  return $ withLoadedCore [CoreRunning] $ \core -> do
+    mdata <- liftIO $ runRetroM core (retroGetMemoryData segment)
+    liftIO $ pokeMemory' mdata address value
 
 withLoadedCore :: [CoreState] -> (RetroCore -> AppM ()) -> AppM ()
 withLoadedCore states f = do

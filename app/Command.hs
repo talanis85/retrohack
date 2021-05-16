@@ -5,6 +5,7 @@ module Command
   , symbolP
   , stringP
   , addressP
+  , valueP
 
   -- * re-exports
   , choice
@@ -34,6 +35,7 @@ lexer = P.makeTokenParser haskellDef
 symbolP = try . P.symbol lexer
 stringP = P.stringLiteral lexer
 addressP = P.natural lexer
+valueP = P.natural lexer
 
 commandP name doc p = do
   symbolP name
