@@ -11,6 +11,7 @@ module AppM
   , appAudio
   , appPrint
   , appMainTasks
+  , appCoreRunning
   , runAppTasks
   , output
   ) where
@@ -28,13 +29,14 @@ type AppM = StateT AppState IO
 evalAppM :: AppM a -> AppState -> IO a
 evalAppM = evalStateT
 
-data CoreState = CoreFresh | CoreStopped | CoreRunning
+data CoreState = CoreFresh | CoreStopped | CoreRunning | CorePaused
   deriving (Eq, Show)
 
 formatCoreState :: CoreState -> String
 formatCoreState CoreFresh = "loaded"
 formatCoreState CoreStopped = "stopped"
 formatCoreState CoreRunning = "running"
+formatCoreState CorePaused = "paused"
 
 data AppState = AppState
   { _appCore :: Maybe (RetroCore, CoreState)
@@ -42,6 +44,7 @@ data AppState = AppState
   , _appAudio :: Audio
   , _appPrint :: String -> AppM ()
   , _appMainTasks :: TQueue (AppM ())
+  , _appCoreRunning :: TMVar ()
   }
 
 makeLenses ''AppState
@@ -60,6 +63,7 @@ runAppTasks = do
 initAppState :: Audio -> Video -> IO AppState
 initAppState audio video = do
   taskQueue <- atomically newTQueue
+  runningVar <- atomically (newTMVar ())
 
   return AppState
     { _appCore = Nothing
@@ -67,4 +71,5 @@ initAppState audio video = do
     , _appAudio = audio
     , _appPrint = liftIO . putStrLn
     , _appMainTasks = taskQueue
+    , _appCoreRunning = runningVar
     }

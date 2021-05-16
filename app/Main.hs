@@ -66,6 +66,8 @@ runCommand = parseCommand
   , cmdAvinfo
   , cmdLoadgame
   , cmdRun
+  , cmdPause
+  , cmdContinue
   , cmdExec
   , cmdPeek
   , cmdPoke
@@ -84,7 +86,7 @@ cmdLoadcore = commandP "loadcore" "<path>" $ do
 
 cmdInfo :: Command
 cmdInfo = commandP "info" "" $ do
-  return $ withLoadedCore [CoreFresh, CoreStopped, CoreRunning] $ \core -> do
+  return $ withLoadedCore [CoreFresh, CoreStopped, CoreRunning, CorePaused] $ \core -> do
     av <- liftIO $ runRetroM core retroApiVersion
     output $ printf "libretro API version: %d" av
 
@@ -94,7 +96,7 @@ cmdInfo = commandP "info" "" $ do
 
 cmdAvinfo :: Command
 cmdAvinfo = commandP "avinfo" "" $ do
-  return $ withLoadedCore [CoreFresh, CoreStopped, CoreRunning] $ \core -> do
+  return $ withLoadedCore [CoreFresh, CoreStopped, CoreRunning, CorePaused] $ \core -> do
     avInfo <- liftIO $ runRetroM core retroGetSystemAvInfo
 
     output $ printf "Base dimensions: %s * %s"
@@ -145,8 +147,10 @@ cmdRun = commandP "run" "" $ do
     audio <- use appAudio
 
     taskQueue <- use appMainTasks
+    runningVar <- use appCoreRunning
 
     let runLoop = do
+          atomically (takeTMVar runningVar >> putTMVar runningVar ())
           runRetroM core retroRun
           videoRender video
 
@@ -172,6 +176,21 @@ cmdRun = commandP "run" "" $ do
 
     output "Game is running"
 
+cmdPause :: Command
+cmdPause = commandP "pause" "" $ do
+  return $ withLoadedCore [CoreRunning] $ \core -> do
+    runningVar <- use appCoreRunning
+    liftIO $ atomically $ takeTMVar runningVar
+    appCore . traversed . _2 .= CorePaused
+
+cmdContinue :: Command
+cmdContinue = commandP "continue" "" $ do
+  return $ withLoadedCore [CorePaused] $ \core -> do
+    runningVar <- use appCoreRunning
+    appCore . traversed . _2 .= CoreRunning
+    liftIO $ atomically $ tryPutTMVar runningVar ()
+    return ()
+
 cmdExec :: Command
 cmdExec = commandP "exec" "<script>" $ do
   path <- stringP
@@ -192,7 +211,7 @@ cmdPeek = commandP "peek" "<type> <segment> <address>" $ do
     , symbolP "rom" >> return ("rom", retroMemoryRom)
     ]
   address <- fromIntegral <$> addressP
-  return $ withLoadedCore [CoreRunning] $ \core -> do
+  return $ withLoadedCore [CoreRunning, CorePaused] $ \core -> do
     mdata <- liftIO $ runRetroM core (retroGetMemoryData segment)
     value <- liftIO $ peekMemoryValue snesArch typ mdata address
     case value of
@@ -212,7 +231,7 @@ cmdPoke = commandP "poke" "<type> <segment> <address> <value>" $ do
     ]
   address <- fromIntegral <$> addressP
   value <- fromIntegral <$> integerP
-  return $ withLoadedCore [CoreRunning] $ \core -> do
+  return $ withLoadedCore [CoreRunning, CorePaused] $ \core -> do
     mdata <- liftIO $ runRetroM core (retroGetMemoryData segment)
     liftIO $ pokeMemoryInteger snesArch typ mdata address value
 
