@@ -33,20 +33,52 @@ commands are available:
 
 * `loadcore /path/to/core.so`
 
-Load a libretro core.
+  Load a libretro core.
 
 * `loadgame /path/to/rom`
 
-Load a game ROM.
+  Load a game ROM.
 
 * `run`
 
-Runs the game.
+  Runs the game.
 
 * `pause`
 
-Pauses the game.
+  Pauses the game.
 
 * `continue`
 
-Continues a paused game.
+  Continues a paused game.
+
+* `info`
+
+  Shows information about the loaded core.
+
+* `avinfo`
+
+  More information about the loaded core :)
+
+* `exec /path/to/script`
+
+  Executes the given file line by line as if they were entered
+  in the REPL.
+
+* `peek <type> <segment> <address>`
+
+  Get the value at the given address.
+  `<type>` is one of:
+
+  `i8`, `i16`, `i32` (signed integers),
+  `u8`, `u16`, `u32` (unsigned integers)
+
+  `<segment>` is one of:
+
+  `sram`, `rtc`, `main`, `video`, `rom`
+
+  (`rom` is not actually supported, but it works with a patched version
+  of snes9x)
+
+* `poke <type> <segment> <address> <value>`
+
+  Set the value at the given address. See `peek` for arguments.
