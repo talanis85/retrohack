@@ -7,6 +7,8 @@ module AppM
   , AppState (..)
   , initAppState
   , appCore
+  , appCoreState
+  , appGame
   , appVideo
   , appAudio
   , appPrint
@@ -44,7 +46,9 @@ formatCoreState CoreRunning = "running"
 formatCoreState CorePaused = "paused"
 
 data AppState = AppState
-  { _appCore :: Maybe (RetroCore, CoreState)
+  { _appCore :: RetroCore
+  , _appCoreState :: CoreState
+  , _appGame :: FilePath
   , _appVideo :: Video
   , _appAudio :: Audio
   , _appPrint :: String -> IO ()
@@ -66,14 +70,16 @@ runAppTasks = do
   tasks <- liftIO $ atomically $ flushTQueue taskQueue
   sequence_ tasks
 
-initAppState :: Audio -> Video -> IO AppState
-initAppState audio video = do
+initAppState :: RetroCore -> FilePath -> Audio -> Video -> IO AppState
+initAppState core game audio video = do
   taskQueue <- atomically newTQueue
   runningVar <- atomically (newTMVar ())
   threads <- atomically (newSyncTVar Map.empty)
 
   return AppState
-    { _appCore = Nothing
+    { _appCore = core
+    , _appCoreState = CoreFresh
+    , _appGame = game
     , _appVideo = video
     , _appAudio = audio
     , _appPrint = putStrLn

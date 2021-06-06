@@ -47,14 +47,6 @@ Usage
 retrohack uses a REPL-style console interface. The following
 commands are available:
 
-* `loadcore /path/to/core.so`
-
-  Load a libretro core.
-
-* `loadgame /path/to/rom`
-
-  Load a game ROM.
-
 * `run`
 
   Runs the game.

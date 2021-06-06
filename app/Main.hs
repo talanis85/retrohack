@@ -17,6 +17,7 @@ import Options.Applicative
 import System.Console.Haskeline hiding (finally)
 import System.Environment
 import System.FilePath
+import System.IO
 import Text.Printf
 
 import AppM
@@ -33,11 +34,13 @@ data Options = Options
   , optGame :: String
   , optScripts :: [ScriptOptions]
   }
+  deriving (Show)
 
 data ScriptOptions = ScriptOptions
   { scriptFile :: FilePath
   , scriptArguments :: [String]
   }
+  deriving (Show)
 
 options :: ParserInfo Options
 options = info (helper <*> (Options <$> optCoreP <*> optGameP <*> many optScriptP))
@@ -54,7 +57,7 @@ optGameP :: Parser FilePath
 optGameP = argument str (metavar "GAME" <> help "Path to the game rom")
 
 optScriptP :: Parser ScriptOptions
-optScriptP = subparser (command "script" (info (ScriptOptions <$> argScriptNameP <*> many argScriptArgP) (progDesc "Load a script")))
+optScriptP = argument (maybeReader (\x -> if x == "script" then Just () else Nothing)) mempty *> (ScriptOptions <$> argScriptNameP <*> many argScriptArgP)
 
 argScriptNameP :: Parser FilePath
 argScriptNameP = argument str (metavar "SCRIPTFILE" <> help "Path to the lua script")
@@ -64,31 +67,32 @@ argScriptArgP = argument str (metavar "COMMAND" <> help "Lua statement to be exe
 
 makePrompt :: AppM String
 makePrompt = do
-  core' <- use appCore
-  case core' of
-    Nothing -> return "no core"
-    Just (core, corestate) -> do
-      sysinfo <- liftIO $ runRetroM core retroGetSystemInfo
-      return $ printf "%s %s (%s)"
-        (retroSystemInfoLibraryName sysinfo)
-        (retroSystemInfoLibraryVersion sysinfo)
-        (formatCoreState corestate)
+  core <- use appCore
+  corestate <- use appCoreState
+  sysinfo <- liftIO $ runRetroM core retroGetSystemInfo
+  return $ printf "%s %s (%s)"
+    (retroSystemInfoLibraryName sysinfo)
+    (retroSystemInfoLibraryVersion sysinfo)
+    (formatCoreState corestate)
 
 main :: IO ()
 main = do
   opts <- execParser options
 
+  core <- liftIO $ loadCore $ optCore opts
+
   audio <- initAudio
   video <- initVideo
-  state <- initAppState audio video
+  state <- initAppState core (optGame opts) audio video
 
   let initActions = do
-        runCommand $ "loadcore \"" ++ optCore opts ++ "\""
-        runCommand $ "loadgame \"" ++ optGame opts ++ "\""
+        resetCore
         forM_ (optScripts opts) $ \x -> do
           runCommand $ "luaload \"" ++ scriptFile x ++ "\""
+          output $ "> luaload \"" ++ scriptFile x ++ "\""
           forM_ (scriptArguments x) $ \arg -> do
             runCommand $ "luaexec \"" ++ scriptFile x ++ "\" \"" ++ arg ++ "\""
+            output $ "> luaexec \"" ++ scriptFile x ++ "\" \"" ++ arg ++ "\""
 
   evalAppM (runInputT defaultSettings (inputLoop initActions)) state
 
@@ -117,10 +121,8 @@ tryLua = try
 
 runCommand :: String -> AppM ()
 runCommand = parseCommand
-  [ cmdLoadcore
-  , cmdInfo
+  [ cmdInfo
   , cmdAvinfo
-  , cmdLoadgame
   , cmdRun
   , cmdPause
   , cmdContinue
@@ -132,17 +134,6 @@ runCommand = parseCommand
   , cmdLuaStatus
   , cmdLuaExec
   ]
-
-cmdLoadcore :: Command
-cmdLoadcore = commandP "loadcore" "<path>" $ do
-  path <- stringP
-  return $ do
-    core <- liftIO (tryIO (loadCore path))
-    case core of
-      Left err -> output $ printf "IOException: %s" (show err)
-      Right core' -> do
-        appCore .= Just (core', CoreFresh)
-        output $ printf "Loaded %s" path
 
 cmdInfo :: Command
 cmdInfo = commandP "info" "" $ do
@@ -168,35 +159,35 @@ cmdAvinfo = commandP "avinfo" "" $ do
     output $ printf "Aspect ratio: %s"
       (show (retroGameGeometryAspectRatio (retroSystemAvInfoGeometry avInfo)))
 
-cmdLoadgame :: Command
-cmdLoadgame = commandP "loadgame" "<path>" $ do
-  path <- stringP
-  return $ withLoadedCore [CoreFresh] $ \core -> do
-    avInfo <- liftIO $ runRetroM core retroGetSystemAvInfo
+resetCore :: AppM ()
+resetCore = do
+  core <- use appCore
+  avInfo <- liftIO $ runRetroM core retroGetSystemAvInfo
 
-    audio <- use appAudio
-    video <- use appVideo
+  audio <- use appAudio
+  video <- use appVideo
+  game <- use appGame
 
-    let environmentHandlers = defaultRetroEnvironmentHandlers
-          { retroEnvironmentHandlersSetPixelFormat = videoSetPixelFormat video
-          }
+  let environmentHandlers = defaultRetroEnvironmentHandlers
+        { retroEnvironmentHandlersSetPixelFormat = videoSetPixelFormat video
+        }
 
-    liftIO $ runRetroM core $ do
-      retroSetEnvironment environmentHandlers
-      retroSetVideoRefresh (videoRefresh video)
-      retroSetInputPoll (videoInputPoll defaultInputMappings video)
-      retroSetInputState (videoInputState video)
-      retroSetAudioSample (audioSample audio)
-      retroSetAudioSampleBatch (audioSampleBatch audio)
-      retroInit
+  liftIO $ runRetroM core $ do
+    retroSetEnvironment environmentHandlers
+    retroSetVideoRefresh (videoRefresh video)
+    retroSetInputPoll (videoInputPoll defaultInputMappings video)
+    retroSetInputState (videoInputState video)
+    retroSetAudioSample (audioSample audio)
+    retroSetAudioSampleBatch (audioSampleBatch audio)
+    retroInit
 
-    result <- liftIO $ tryIO $ runRetroM core $ do
-      gameInfo <- loadGameInfo path
-      retroLoadGame gameInfo
+  result <- liftIO $ tryIO $ runRetroM core $ do
+    gameInfo <- loadGameInfo game
+    retroLoadGame gameInfo
 
-    case result of
-      Left err -> output $ printf "IOException: %s" (show err)
-      Right () -> appCore . traversed . _2 .= CoreStopped
+  case result of
+    Left err -> output $ printf "IOException: %s" (show err)
+    Right () -> appCoreState .= CoreStopped
 
 cmdRun :: Command
 cmdRun = commandP "run" "" $ do
@@ -206,6 +197,7 @@ cmdRun = commandP "run" "" $ do
     video <- use appVideo
     audio <- use appAudio
     printFun <- use appPrint
+    game <- use appGame
 
     taskQueue <- use appMainTasks
     runningVar <- use appCoreRunning
@@ -220,13 +212,13 @@ cmdRun = commandP "run" "" $ do
 
       configureVideo video (retroSystemAvInfoGeometry avInfo)
 
-      emulatorProcess core video runningVar taskQueue luaThreadsVar printFun
+      emulatorProcess core video runningVar taskQueue luaThreadsVar printFun (dropExtension game)
 
       deconfigureVideo video
       runRetroM core $ retroDeinit
-      runRetroM core $ retroInit
+      atomically $ writeTQueue taskQueue resetCore
 
-    appCore . traversed . _2 .= CoreRunning
+    appCoreState .= CoreRunning
 
     output "Game is running"
 
@@ -237,10 +229,16 @@ emulatorProcess
   -> TQueue (AppM ())
   -> SyncTVar (Map.Map String LuaThread)
   -> (String -> IO ())
+  -> String
   -> IO ()
-emulatorProcess core video runningVar taskQueue luaThreadsVar printFun = do
+emulatorProcess core video runningVar taskQueue luaThreadsVar printFun romBaseName = do
+  -- Load SRAM
+  mdata <- runRetroM core (retroGetMemoryData retroMemorySaveRam)
+  withBinaryFile (romBaseName ++ ".srm") ReadMode $ \h -> do
+    hGetBuf h (memoryDataPtr mdata) (memoryDataSize mdata)
+
   runLuaHook "retrohack_start"
-  loop
+  loop 0
   runLuaHook "retrohack_stop"
   where
     runLuaHook name = do
@@ -253,11 +251,11 @@ emulatorProcess core video runningVar taskQueue luaThreadsVar printFun = do
             unlockSyncTVar luaThreadsVar
             tryTakeTMVar runningVar
             writeTQueue taskQueue $ do
-              appCore . traversed . _2 .= CorePaused
+              appCoreState .= CorePaused
           printFun (show err)
         Right luaThreads'' -> atomically $ writeAndUnlock luaThreadsVar luaThreads''
 
-    loop = do
+    loop framecount = do
       atomically (takeTMVar runningVar >> putTMVar runningVar ())
 
       runLuaHook "retrohack_frame"
@@ -265,24 +263,30 @@ emulatorProcess core video runningVar taskQueue luaThreadsVar printFun = do
       runRetroM core retroRun
       videoRender video
 
+      -- Save SRAM every second
+      when (framecount `mod` 60 == 0) $ do
+        mdata <- runRetroM core (retroGetMemoryData retroMemorySaveRam)
+        withBinaryFile (romBaseName ++ ".srm") WriteMode $ \h -> do
+          hPutBuf h (memoryDataPtr mdata) (memoryDataSize mdata)
+
       shouldClose <- windowShouldClose video
       if shouldClose
         then atomically $ writeTQueue taskQueue $ do
-          appCore . traversed . _2 .= CoreStopped
-        else loop
+          appCoreState .= CoreStopped
+        else loop (framecount + 1)
 
 cmdPause :: Command
 cmdPause = commandP "pause" "" $ do
   return $ withLoadedCore [CoreRunning] $ \core -> do
     runningVar <- use appCoreRunning
     liftIO $ atomically $ takeTMVar runningVar
-    appCore . traversed . _2 .= CorePaused
+    appCoreState .= CorePaused
 
 cmdContinue :: Command
 cmdContinue = commandP "continue" "" $ do
   return $ withLoadedCore [CorePaused] $ \core -> do
     runningVar <- use appCoreRunning
-    appCore . traversed . _2 .= CoreRunning
+    appCoreState .= CoreRunning
     liftIO $ atomically $ tryPutTMVar runningVar ()
     return ()
 
@@ -389,11 +393,8 @@ cmdLuaExec = commandP "luaexec" "<filename> <command>" $ do
 withLoadedCore :: [CoreState] -> (RetroCore -> AppM ()) -> AppM ()
 withLoadedCore states f = do
   core <- use appCore
-  case core of
-    Nothing -> output "Error: No core loaded"
-    Just (core', corestate) -> if corestate `elem` states
-                                  then f core'
-                                  else output "Error: Invalid core state"
+  corestate <- use appCoreState
+  if corestate `elem` states then f core else output "Error: Invalid core state"
 
 loadGameInfo :: FilePath -> RetroM RetroGameInfo
 loadGameInfo fp = do
