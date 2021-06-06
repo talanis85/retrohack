@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 6021f529fd7e234239ccf7347c9edc74f4ba82bb1ec2b5d2d9c3acb55051a887
+-- hash: 069a92755c677c804fb23873d74417a7528378b99dece35b706ae4aa19ed6497
 
 name:           retrohack
 version:        0.1.0.0
@@ -60,6 +60,8 @@ executable retrohack
       Audio
       Command
       Log
+      Lua
+      SyncTVar
       Video
       Paths_retrohack
   hs-source-dirs:
@@ -73,10 +75,13 @@ executable retrohack
     , base >=4.7 && <5
     , bytestring
     , containers
+    , filepath
     , gl3w
     , haskeline
+    , hslua
     , lens
     , mtl
+    , optparse-applicative
     , parsec
     , retrohack
     , sample-frame

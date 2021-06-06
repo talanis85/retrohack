@@ -12,15 +12,20 @@ module AppM
   , appPrint
   , appMainTasks
   , appCoreRunning
+  , appLuaThreads
   , runAppTasks
+  , withLuaThreads
   , output
   ) where
 
 import Control.Concurrent.STM
 import Control.Lens
 import Control.Monad.State.Strict
+import qualified Data.Map as Map
 
+import SyncTVar
 import Libretro
+import Lua
 import Audio
 import Video
 
@@ -42,9 +47,10 @@ data AppState = AppState
   { _appCore :: Maybe (RetroCore, CoreState)
   , _appVideo :: Video
   , _appAudio :: Audio
-  , _appPrint :: String -> AppM ()
+  , _appPrint :: String -> IO ()
   , _appMainTasks :: TQueue (AppM ())
   , _appCoreRunning :: TMVar ()
+  , _appLuaThreads :: SyncTVar (Map.Map String LuaThread)
   }
 
 makeLenses ''AppState
@@ -52,7 +58,7 @@ makeLenses ''AppState
 output :: String -> AppM ()
 output s = do
   f <- use appPrint
-  f s
+  liftIO $ f s
 
 runAppTasks :: AppM ()
 runAppTasks = do
@@ -64,12 +70,22 @@ initAppState :: Audio -> Video -> IO AppState
 initAppState audio video = do
   taskQueue <- atomically newTQueue
   runningVar <- atomically (newTMVar ())
+  threads <- atomically (newSyncTVar Map.empty)
 
   return AppState
     { _appCore = Nothing
     , _appVideo = video
     , _appAudio = audio
-    , _appPrint = liftIO . putStrLn
+    , _appPrint = putStrLn
     , _appMainTasks = taskQueue
     , _appCoreRunning = runningVar
+    , _appLuaThreads = threads
     }
+
+withLuaThreads :: StateT (Map.Map String LuaThread) AppM a -> AppM a
+withLuaThreads x = do
+  threadsVar <- use appLuaThreads
+  threads <- liftIO $ atomically $ readAndLock threadsVar
+  (a, threads') <- runStateT x threads
+  liftIO $ atomically $ writeAndUnlock threadsVar threads'
+  return a

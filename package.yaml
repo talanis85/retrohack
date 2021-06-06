@@ -45,10 +45,13 @@ executables:
     - retrohack
     - alsa-pcm
     - bytestring
+    - filepath
     - gl3w
     - GLFW-b
     - haskeline
+    - hslua
     - OpenGL
+    - optparse-applicative
     - parsec
     - sample-frame
     - stm

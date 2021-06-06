@@ -6,20 +6,61 @@ import Control.Exception
 import Control.Monad
 import Control.Monad.State.Strict
 import Control.Monad.Trans
-import Control.Lens
+import Control.Lens hiding (argument)
 import qualified Data.ByteString as BS
+import qualified Data.ByteString.Char8 as BS8
+import qualified Data.Map as Map
 import qualified Data.Text as T
 import Data.Word
-import System.Console.Haskeline
+import qualified Foreign.Lua as Lua
+import Options.Applicative
+import System.Console.Haskeline hiding (finally)
 import System.Environment
+import System.FilePath
 import Text.Printf
 
 import AppM
+import SyncTVar
 import Command
 import Retrohack.Memory
 import Libretro
+import Lua
 import Audio
 import Video
+
+data Options = Options
+  { optCore :: String
+  , optGame :: String
+  , optScripts :: [ScriptOptions]
+  }
+
+data ScriptOptions = ScriptOptions
+  { scriptFile :: FilePath
+  , scriptArguments :: [String]
+  }
+
+options :: ParserInfo Options
+options = info (helper <*> (Options <$> optCoreP <*> optGameP <*> many optScriptP))
+  (  fullDesc
+  <> progDesc "Libretro frontend with lua support"
+  <> header "retrohack"
+  <> footer ("Version: 0.0.1")
+  )
+
+optCoreP :: Parser FilePath
+optCoreP = argument str (metavar "CORE" <> help "Path to the libretro core")
+
+optGameP :: Parser FilePath
+optGameP = argument str (metavar "GAME" <> help "Path to the game rom")
+
+optScriptP :: Parser ScriptOptions
+optScriptP = subparser (command "script" (info (ScriptOptions <$> argScriptNameP <*> many argScriptArgP) (progDesc "Load a script")))
+
+argScriptNameP :: Parser FilePath
+argScriptNameP = argument str (metavar "SCRIPTFILE" <> help "Path to the lua script")
+
+argScriptArgP :: Parser String
+argScriptArgP = argument str (metavar "COMMAND" <> help "Lua statement to be executed at initialization")
 
 makePrompt :: AppM String
 makePrompt = do
@@ -35,15 +76,27 @@ makePrompt = do
 
 main :: IO ()
 main = do
+  opts <- execParser options
+
   audio <- initAudio
   video <- initVideo
   state <- initAppState audio video
-  evalAppM (runInputT defaultSettings inputLoop) state
 
-inputLoop :: InputT AppM ()
-inputLoop = do
+  let initActions = do
+        runCommand $ "loadcore \"" ++ optCore opts ++ "\""
+        runCommand $ "loadgame \"" ++ optGame opts ++ "\""
+        forM_ (optScripts opts) $ \x -> do
+          runCommand $ "luaload \"" ++ scriptFile x ++ "\""
+          forM_ (scriptArguments x) $ \arg -> do
+            runCommand $ "luaexec \"" ++ scriptFile x ++ "\" \"" ++ arg ++ "\""
+
+  evalAppM (runInputT defaultSettings (inputLoop initActions)) state
+
+inputLoop :: AppM () -> InputT AppM ()
+inputLoop initActions = do
   printFun <- getExternalPrint
-  lift $ appPrint .= lift . printFun
+  lift $ appPrint .= printFun
+  lift $ initActions
   loop
   where
     loop = do
@@ -59,6 +112,9 @@ inputLoop = do
 tryIO :: IO a -> IO (Either IOException a)
 tryIO = try
 
+tryLua :: IO a -> IO (Either Lua.Exception a)
+tryLua = try
+
 runCommand :: String -> AppM ()
 runCommand = parseCommand
   [ cmdLoadcore
@@ -71,6 +127,10 @@ runCommand = parseCommand
   , cmdExec
   , cmdPeek
   , cmdPoke
+  , cmdLuaLoad
+  , cmdLuaUnload
+  , cmdLuaStatus
+  , cmdLuaExec
   ]
 
 cmdLoadcore :: Command
@@ -145,20 +205,11 @@ cmdRun = commandP "run" "" $ do
 
     video <- use appVideo
     audio <- use appAudio
+    printFun <- use appPrint
 
     taskQueue <- use appMainTasks
     runningVar <- use appCoreRunning
-
-    let runLoop = do
-          atomically (takeTMVar runningVar >> putTMVar runningVar ())
-          runRetroM core retroRun
-          videoRender video
-
-          shouldClose <- windowShouldClose video
-          if shouldClose
-            then atomically $ writeTQueue taskQueue $ do
-              appCore . traversed . _2 .= CoreStopped
-            else runLoop
+    luaThreadsVar <- use appLuaThreads
 
     liftIO $ forkIO $ do
       audioResult <- tryIO $
@@ -168,13 +219,57 @@ cmdRun = commandP "run" "" $ do
         Right () -> return ()
 
       configureVideo video (retroSystemAvInfoGeometry avInfo)
-      runLoop
+
+      emulatorProcess core video runningVar taskQueue luaThreadsVar printFun
+
       deconfigureVideo video
       runRetroM core $ retroDeinit
+      runRetroM core $ retroInit
 
     appCore . traversed . _2 .= CoreRunning
 
     output "Game is running"
+
+emulatorProcess
+  :: RetroCore
+  -> Video
+  -> TMVar ()
+  -> TQueue (AppM ())
+  -> SyncTVar (Map.Map String LuaThread)
+  -> (String -> IO ())
+  -> IO ()
+emulatorProcess core video runningVar taskQueue luaThreadsVar printFun = do
+  runLuaHook "retrohack_start"
+  loop
+  runLuaHook "retrohack_stop"
+  where
+    runLuaHook name = do
+      luaThreads <- atomically $ readAndLock luaThreadsVar
+      luaThreads' <- tryLua $ forM luaThreads $ \thread ->
+        runWithLuaThread thread (Lua.callFunc name :: Lua.Lua ())
+      case luaThreads' of
+        Left err -> do
+          atomically $ do
+            unlockSyncTVar luaThreadsVar
+            tryTakeTMVar runningVar
+            writeTQueue taskQueue $ do
+              appCore . traversed . _2 .= CorePaused
+          printFun (show err)
+        Right luaThreads'' -> atomically $ writeAndUnlock luaThreadsVar luaThreads''
+
+    loop = do
+      atomically (takeTMVar runningVar >> putTMVar runningVar ())
+
+      runLuaHook "retrohack_frame"
+
+      runRetroM core retroRun
+      videoRender video
+
+      shouldClose <- windowShouldClose video
+      if shouldClose
+        then atomically $ writeTQueue taskQueue $ do
+          appCore . traversed . _2 .= CoreStopped
+        else loop
 
 cmdPause :: Command
 cmdPause = commandP "pause" "" $ do
@@ -234,6 +329,62 @@ cmdPoke = commandP "poke" "<type> <segment> <address> <value>" $ do
   return $ withLoadedCore [CoreRunning, CorePaused] $ \core -> do
     mdata <- liftIO $ runRetroM core (retroGetMemoryData segment)
     liftIO $ pokeMemoryInteger snesArch typ mdata address value
+
+cmdLuaLoad :: Command
+cmdLuaLoad = commandP "luaload" "<filename>" $ do
+  filename <- stringP
+  return $ withLoadedCore [CoreStopped, CorePaused, CoreRunning] $ \core -> do
+    printFun <- use appPrint
+
+    newThread <- liftIO $ tryLua $ do
+      luaThread <- liftIO $ createLuaThread
+      liftIO $ runWithLuaThread luaThread $ do
+        Lua.openlibs
+        Lua.dostring (BS8.pack (printf "package.path = package.path .. ';%s/?.lua'" (takeDirectory filename)))
+        Lua.registerHaskellFunction "output" (luafOutput printFun)
+        Lua.registerHaskellFunction "memory_read" (luafMemoryRead core)
+        Lua.registerHaskellFunction "memory_write" (luafMemoryWrite core)
+        status <- Lua.dofile filename
+        when (status /= Lua.OK) $ Lua.throwTopMessage
+
+    case newThread of
+      Left err -> output (show err)
+      Right newThread' -> withLuaThreads $ do
+        threads <- get
+        liftIO $ mapM_ destroyLuaThread $ Map.lookup filename threads
+        modify $ Map.insert filename newThread'
+
+cmdLuaUnload :: Command
+cmdLuaUnload = commandP "luaunload" "<filename>" $ do
+  filename <- stringP
+  return $ withLuaThreads $ do
+    threads <- get
+    case Map.lookup filename threads of
+      Nothing -> do
+        lift $ output $ printf "Script %s is not loaded" filename
+      Just oldThread' -> do
+        liftIO $ destroyLuaThread oldThread'
+        modify $ Map.delete filename
+
+cmdLuaStatus :: Command
+cmdLuaStatus = commandP "luastatus" "" $ do
+  return $ do
+    threadsVar <- use appLuaThreads
+    threads <- liftIO $ atomically $ readSyncTVar threadsVar
+    forM_ (Map.toAscList threads) $ \(filename, _) -> do
+      output filename
+
+cmdLuaExec :: Command
+cmdLuaExec = commandP "luaexec" "<filename> <command>" $ do
+  filename <- stringP
+  cmd <- stringP
+  return $ withLuaThreads $ do
+    threads <- get
+    case Map.lookup filename threads of
+      Nothing -> lift $ output $ printf "No thread called '%s'" filename
+      Just thread -> do
+        thread' <- liftIO $ runWithLuaThread thread $ Lua.dostring (BS8.pack (cmd ++ "\n"))
+        modify $ Map.insert filename thread'
 
 withLoadedCore :: [CoreState] -> (RetroCore -> AppM ()) -> AppM ()
 withLoadedCore states f = do

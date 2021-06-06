@@ -4,6 +4,8 @@ module Retrohack.Memory
   , Bytes (..)
   , Value (..)
   , DataType (..)
+  , parseDataType
+  , printDataType
 
   , MemoryArch
   , snesArch
@@ -30,6 +32,23 @@ data Signedness = Unsigned | SignedSignMag | SignedOnes | SignedTwos
 
 data DataType = U8 | U16 | U32 | I8 | I16 | I32
   deriving (Eq, Show)
+
+parseDataType :: String -> Maybe DataType
+parseDataType "i8"  = Just I8
+parseDataType "i16" = Just I16
+parseDataType "i32" = Just I32
+parseDataType "u8"  = Just U8
+parseDataType "u16" = Just U16
+parseDataType "u32" = Just U32
+parseDataType _ = Nothing
+
+printDataType :: DataType -> String
+printDataType I8  = "i8"
+printDataType I16 = "i16"
+printDataType I32 = "i32"
+printDataType U8  = "u8"
+printDataType U16 = "u16"
+printDataType U32 = "u32"
 
 type MemoryArch = DataType -> (Int, Endianness, Signedness)
 

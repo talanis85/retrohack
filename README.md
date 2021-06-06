@@ -25,6 +25,22 @@ Installation
 2. `git clone https://github.com/talanis85/retrohack.git`
 3. `cd retrohack && stack install`
 
+Command line
+------------
+
+Examples:
+
+* Just load a core with a game:
+  `retrohack /path/to/core.so /path/to/rom`
+
+* Also load a lua script:
+  `retrohack /path/to/core.so /path/to/rom script /path/to/script.lua`
+
+* Also execute some lua commands at initialization:
+  `retrohack /path/to/core.so /path/to/rom script /path/to/script.lua "some.global = true"`
+
+Whatever you choose, you will still have to type `run` to start the emulator.
+
 Usage
 -----
 
