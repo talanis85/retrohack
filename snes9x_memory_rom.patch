@@ -1,0 +1,44 @@
+diff --git a/libretro/libretro.cpp b/libretro/libretro.cpp
+index 0304556..0e381f9 100644
+--- a/libretro/libretro.cpp
++++ b/libretro/libretro.cpp
+@@ -1891,9 +1891,9 @@ void* retro_get_memory_data(unsigned type)
+         case RETRO_MEMORY_VIDEO_RAM:
+         data = Memory.VRAM;
+         break;
+-        //case RETRO_MEMORY_ROM:
+-        //	data = Memory.ROM;
+-        //	break;
++        case RETRO_MEMORY_ROM:
++            data = Memory.ROM;
++            break;
+         default:
+             data = NULL;
+             break;
+@@ -1925,9 +1925,9 @@ size_t retro_get_memory_size(unsigned type)
+         case RETRO_MEMORY_VIDEO_RAM:
+             size = 64 * 1024;
+             break;
+-        //case RETRO_MEMORY_ROM:
+-        //	size = Memory.CalculatedSize;
+-        //	break;
++        case RETRO_MEMORY_ROM:
++            size = Memory.CalculatedSize;
++            break;
+         default:
+             size = 0;
+             break;
+diff --git a/libretro/libretro.h b/libretro/libretro.h
+index d0f1042..a43e641 100644
+--- a/libretro/libretro.h
++++ b/libretro/libretro.h
+@@ -308,6 +308,9 @@ enum retro_language
+ /* Video ram lets a frontend peek into a game systems video RAM (VRAM). */
+ #define RETRO_MEMORY_VIDEO_RAM   3
+ 
++/* ROM memory */
++#define RETRO_MEMORY_ROM         4
++
+ /* Keysyms used for ID in input state callback when polling RETRO_KEYBOARD. */
+ enum retro_key
+ {
