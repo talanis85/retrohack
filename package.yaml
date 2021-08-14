@@ -45,6 +45,7 @@ executables:
     - retrohack
     - alsa-pcm
     - bytestring
+    - directory
     - filepath
     - gl3w
     - GLFW-b

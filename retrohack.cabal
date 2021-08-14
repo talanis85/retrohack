@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 069a92755c677c804fb23873d74417a7528378b99dece35b706ae4aa19ed6497
+-- hash: 4ee032db32e46f07b382830603d3f4578cf5d7beec5d630a6937ac1a34e77299
 
 name:           retrohack
 version:        0.1.0.0
@@ -75,6 +75,7 @@ executable retrohack
     , base >=4.7 && <5
     , bytestring
     , containers
+    , directory
     , filepath
     , gl3w
     , haskeline

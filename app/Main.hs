@@ -15,6 +15,7 @@ import Data.Word
 import qualified Foreign.Lua as Lua
 import Options.Applicative
 import System.Console.Haskeline hiding (finally)
+import System.Directory
 import System.Environment
 import System.FilePath
 import System.IO
@@ -234,8 +235,11 @@ emulatorProcess
 emulatorProcess core video runningVar taskQueue luaThreadsVar printFun romBaseName = do
   -- Load SRAM
   mdata <- runRetroM core (retroGetMemoryData retroMemorySaveRam)
-  withBinaryFile (romBaseName ++ ".srm") ReadMode $ \h -> do
-    hGetBuf h (memoryDataPtr mdata) (memoryDataSize mdata)
+  sramExists <- doesFileExist (romBaseName ++ ".srm")
+  when sramExists $ do
+    withBinaryFile (romBaseName ++ ".srm") ReadMode $ \h -> do
+      hGetBuf h (memoryDataPtr mdata) (memoryDataSize mdata)
+    return ()
 
   runLuaHook "retrohack_start"
   loop 0
